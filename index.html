@@ -1,0 +1,2313 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradeHub - Platform & Multi-Vendor Marketplace</title>
+    <link rel="icon" href="icon.png">
+    
+    <!-- PWA Web App Manifest (Data URI for direct browser installation) -->
+    <link rel="manifest" href='data:application/manifest+json,{"name":"TradeHub Multi-Vendor Marketplace","short_name":"TradeHub","start_url":"/","display":"standalone","background_color":"#0f172a","theme_color":"#2563eb","icons":[{"src":"https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=192&h=192&fit=crop","sizes":"192x192","type":"image/png"},{"src":"https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=512&h=512&fit=crop","sizes":"512x512","type":"image/png"}]}'>
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Paystack Inline JS SDK -->
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCBwJHfr0wk1rxZYW-qswTApJchkS2U3vQ",
+            authDomain: "tradehub-8e3f2.firebaseapp.com",
+            projectId: "tradehub-8e3f2",
+            storageBucket: "tradehub-8e3f2.firebasestorage.app",
+            messagingSenderId: "20111860694",
+            appId: "1:20111860694:web:e47510c18ec29d66733a77",
+            measurementId: "G-78FV7CRKNP"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            window.firebaseStorage = getStorage(app);
+            window.firebaseDb = getFirestore(app);
+            window.firebaseHelpers = { ref, uploadBytes, getDownloadURL, collection, addDoc, getDocs, doc, updateDoc, deleteDoc };
+            console.log("Firebase Storage Initialized.");
+        } catch (e) {
+            console.warn("Firebase running in local fallback mode.", e);
+        }
+    </script>
+
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        .bg-custom-overlay {
+            background-image: linear-gradient(to bottom, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.95)), 
+                              url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1920&q=80');
+            background-attachment: fixed;
+            background-size: cover;
+            background-position: center;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .dark .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        #app-root {
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr) auto;
+            min-height: 100vh;
+            min-height: 100dvh;
+            width: 100vw;
+            overflow-x: hidden;
+        }
+
+        .dashboard-grid-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 0.75rem;
+        }
+
+        @media (min-width: 640px) {
+            .dashboard-grid-layout {
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                gap: 1.25rem;
+            }
+        }
+
+        @media (max-width: 639px) {
+            #notif-dropdown {
+                position: fixed;
+                top: 4rem;
+                left: 1rem;
+                right: 1rem;
+                width: auto;
+                max-width: none;
+                margin-top: 0;
+            }
+        }
+    </style>
+</head>
+<body class="bg-custom-overlay text-slate-800 dark:text-slate-100 font-sans antialiased h-full transition-colors duration-200">
+
+    <div id="app-root">
+
+        <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+        <!-- PWA Installation Banner Popup -->
+        <div id="pwa-install-banner" class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 z-50 max-w-md bg-slate-900/95 border border-brand-500/50 p-4 rounded-2xl shadow-2xl backdrop-blur-md hidden flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-brand-600/30 border border-brand-500/40 text-brand-400 rounded-xl flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-mobile-screen-button text-xl"></i>
+                </div>
+                <div>
+                    <h4 class="text-xs font-bold text-white">Install TradeHub Mobile App</h4>
+                    <p class="text-[10px] text-slate-400">Add to your device home screen for fast mobile access.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button onclick="triggerPWAInstall()" class="bg-brand-600 hover:bg-brand-700 text-white font-bold text-[11px] px-3 py-1.5 rounded-xl transition shadow-md">Install</button>
+                <button onclick="dismissPWAInstall()" class="text-slate-400 hover:text-white text-xs p-1"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>
+
+        <div id="modal-overlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+            <div id="modal-box" class="glass-panel rounded-2xl shadow-2xl max-w-2xl w-full p-5 sm:p-6 transform transition-all max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <div id="modal-content"></div>
+            </div>
+        </div>
+
+        <!-- Dynamic Dismiss Overlay for User Sidebar -->
+        <div id="sidebar-backdrop" onclick="closeSettingsSidebar()" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+
+        <!-- Sidebar Platform Settings Dynamic Renderer -->
+        <aside id="settings-sidebar" class="fixed top-0 left-0 h-full w-72 sm:w-80 glass-panel shadow-2xl z-50 transform -translate-x-full transition-transform duration-300 ease-in-out border-r border-slate-200/50 dark:border-slate-800 flex flex-col justify-between">
+            <div>
+                <div class="p-4 sm:p-5 border-b border-slate-200/40 dark:border-slate-800 flex justify-between items-center bg-slate-900/90 text-white">
+                    <h3 id="sidebar-header-title" class="font-bold text-base sm:text-lg flex items-center gap-2"><i class="fa-solid fa-gears text-brand-500"></i> Platform Settings</h3>
+                    <button onclick="closeSettingsSidebar()" class="text-slate-400 hover:text-white p-1 rounded-lg"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                
+                <div id="sidebar-features-container" class="p-4 sm:p-5 flex-1 overflow-y-auto space-y-6 text-sm custom-scrollbar max-h-[calc(100vh-140px)]">
+                    <!-- Dynamic rendering -->
+                </div>
+            </div>
+
+            <div id="sidebar-user-footer" class="p-4 border-t border-slate-800 bg-slate-900/80 flex items-center justify-between">
+                <!-- Dynamic Sidebar Profile Render -->
+            </div>
+        </aside>
+
+        <!-- Main Header -->
+        <header class="glass-panel sticky top-0 z-30 shadow-lg border-b border-slate-200/50 dark:border-slate-800/80">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <button id="btn-settings-toggle" onclick="toggleSettingsSidebar()" class="p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-800/50 rounded-xl transition">
+                        <i class="fa-solid fa-bars text-lg"></i>
+                    </button>
+                    <a href="#" onclick="handleLogoClick()" class="text-lg sm:text-xl font-black text-brand-500 flex items-center gap-1.5 sm:gap-2">
+                        <i class="fa-solid fa-store text-xl sm:text-2xl"></i> TradeHub
+                    </a>
+                </div>
+
+                <nav id="app-nav-bar" class="hidden md:flex items-center gap-6 text-sm font-medium">
+                </nav>
+
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <button onclick="navigateTo('marketplace')" class="hidden sm:flex items-center gap-2 bg-brand-600/20 text-brand-400 border border-brand-500/30 hover:bg-brand-600 hover:text-white px-3.5 py-1.5 rounded-xl font-bold text-xs transition">
+                        <i class="fa-solid fa-shop"></i> Marketplace
+                    </button>
+
+                    <!-- FUNCTIONAL NOTIFICATION BELL ICON -->
+                    <div class="relative">
+                        <button onclick="toggleNotificationDropdown(event)" class="p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-800/50 rounded-xl transition relative" title="Notifications">
+                            <i class="fa-solid fa-bell text-lg"></i>
+                            <span id="notif-badge" class="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full hidden">0</span>
+                        </button>
+                        
+                        <div id="notif-dropdown" class="absolute right-0 mt-2 w-80 glass-panel rounded-2xl shadow-2xl border border-slate-700 p-4 hidden z-50">
+                            <div class="flex justify-between items-center border-b border-slate-700 pb-2 mb-3">
+                                <h4 class="font-bold text-xs uppercase tracking-wider text-slate-200 flex items-center gap-1.5"><i class="fa-solid fa-bell text-brand-500"></i> Notifications Log</h4>
+                                <button onclick="clearNotifications()" class="text-[10px] text-slate-400 hover:text-rose-400">Clear All</button>
+                            </div>
+                            <div id="notif-list-container" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar text-xs">
+                                <p class="text-slate-400 text-center text-xs py-2">No recent activity logs.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="toggleDarkMode()" class="p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-800/50 rounded-xl transition" title="Toggle Theme">
+                        <i id="theme-toggle-icon" class="fa-solid fa-moon text-lg"></i>
+                    </button>
+
+                    <div id="nav-auth-area" class="flex items-center gap-2"></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Application View Area -->
+        <main class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col justify-start">
+
+            <!-- LANDING PAGE -->
+            <section id="view-landing" class="space-y-12 sm:space-y-16 py-4 sm:py-8">
+                <div class="text-center max-w-3xl mx-auto space-y-4 sm:space-y-6">
+                    <span class="bg-brand-500/10 text-brand-500 border border-brand-500/20 text-[10px] sm:text-xs font-bold px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full uppercase tracking-wider inline-block">Multi-Vendor E-Commerce Engine</span>
+                    <h1 class="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight leading-tight">Scale Your Store with Direct WhatsApp Commerce</h1>
+                    <p class="text-slate-300 text-sm sm:text-base md:text-lg">TradeHub powers cloud product listings, individual merchant storefronts, multi-image product galleries, instant local payment processing, and complete operational analytics.</p>
+                    <div class="flex flex-wrap justify-center gap-3 sm:gap-4 pt-2">
+                        <button onclick="navigateTo('plans')" class="bg-brand-600 text-white px-6 sm:px-8 py-3 sm:py-3.5 rounded-2xl font-bold text-xs sm:text-sm hover:bg-brand-700 shadow-lg shadow-brand-500/25 transition">Get Started</button>
+                        <button onclick="navigateTo('marketplace')" class="glass-panel px-6 sm:px-8 py-3 sm:py-3.5 rounded-2xl font-bold text-xs sm:text-sm hover:bg-white/10 transition flex items-center gap-2">
+                            <i class="fa-solid fa-store"></i> Browse Marketplace
+                        </button>
+                    </div>
+                </div>
+
+                <!-- DELIVERY METHODS SECTION -->
+                <div class="space-y-6 sm:space-y-8">
+                    <div class="text-center max-w-xl mx-auto space-y-2">
+                        <h2 class="text-2xl sm:text-3xl font-black">Flexible Delivery Methods</h2>
+                        <p class="text-slate-400 text-xs sm:text-sm">Transparent shipping policies tailored for customer convenience and merchant safety.</p>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="glass-panel p-6 sm:p-8 rounded-3xl space-y-4 border border-emerald-500/30">
+                            <div class="w-12 h-12 bg-emerald-500/20 text-emerald-400 font-bold rounded-2xl flex items-center justify-center text-2xl">
+                                <i class="fa-solid fa-truck-ramp-box"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-emerald-400">Same Locality: Pay on Delivery</h3>
+                            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                                Deliveries made within the vendor's immediate municipality or city support <strong>Pay on Delivery (COD)</strong>. Customers inspect items in person upon doorstep arrival before completing cash or Mobile Money transfers directly to the dispatch agent.
+                            </p>
+                            <ul class="text-xs space-y-1.5 text-slate-400">
+                                <li><i class="fa-solid fa-check text-emerald-400 mr-2"></i>Same-day express dispatch available</li>
+                                <li><i class="fa-solid fa-check text-emerald-400 mr-2"></i>Product inspection prior to payment</li>
+                                <li><i class="fa-solid fa-check text-emerald-400 mr-2"></i>Direct vendor hotline coordination</li>
+                            </ul>
+                        </div>
+                        <div class="glass-panel p-6 sm:p-8 rounded-3xl space-y-4 border border-brand-500/30">
+                            <div class="w-12 h-12 bg-brand-500/20 text-brand-400 font-bold rounded-2xl flex items-center justify-center text-2xl">
+                                <i class="fa-solid fa-plane-departure"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-brand-400">Outside Locality: Pay Before Delivery</h3>
+                            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                                Regional, inter-state, or long-distance intercity parcels require <strong>Payment Before Delivery</strong>. Funds are processed securely through our platform escrow or Paystack integration prior to waybill courier booking.
+                            </p>
+                            <ul class="text-xs space-y-1.5 text-slate-400">
+                                <li><i class="fa-solid fa-check text-brand-400 mr-2"></i>Insured waybill & courier tracking pings</li>
+                                <li><i class="fa-solid fa-check text-brand-400 mr-2"></i>Guaranteed escrow payment protection</li>
+                                <li><i class="fa-solid fa-check text-brand-400 mr-2"></i>24-48 hour regional delivery guarantee</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HOW IT WORKS SECTION -->
+                <div class="space-y-6 sm:space-y-8">
+                    <div class="text-center max-w-xl mx-auto space-y-2">
+                        <h2 class="text-2xl sm:text-3xl font-black">How TradeHub Works</h2>
+                        <p class="text-slate-400 text-xs sm:text-sm">Launch your storefront in three effortless steps and start accepting orders instantly.</p>
+                    </div>
+                    <div class="grid sm:grid-cols-3 gap-4 sm:gap-6">
+                        <div class="glass-panel p-5 sm:p-6 rounded-3xl space-y-3 text-center border border-white/10 hover:border-brand-500/50 transition">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-brand-500/20 text-brand-400 font-bold rounded-2xl flex items-center justify-center mx-auto text-lg sm:text-xl">1</div>
+                            <h3 class="font-bold text-base sm:text-lg">Create Account & Plan</h3>
+                            <p class="text-xs text-slate-300">Sign up and select a subscription tier with integrated secure Paystack checkout.</p>
+                        </div>
+                        <div class="glass-panel p-5 sm:p-6 rounded-3xl space-y-3 text-center border border-white/10 hover:border-brand-500/50 transition">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-500/20 text-emerald-400 font-bold rounded-2xl flex items-center justify-center mx-auto text-lg sm:text-xl">2</div>
+                            <h3 class="font-bold text-base sm:text-lg">Upload Product Catalog</h3>
+                            <p class="text-xs text-slate-300">Add products with 6+ high-resolution photos, product videos, prices, and stock counts.</p>
+                        </div>
+                        <div class="glass-panel p-5 sm:p-6 rounded-3xl space-y-3 text-center border border-white/10 hover:border-brand-500/50 transition">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-amber-500/20 text-amber-400 font-bold rounded-2xl flex items-center justify-center mx-auto text-lg sm:text-xl">3</div>
+                            <h3 class="font-bold text-base sm:text-lg">Receive Instant Direct Orders</h3>
+                            <p class="text-xs text-slate-300">Buyers browse your products and checkout directly to your dedicated WhatsApp phone line.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WHY YOU SHOULD JOIN SECTION -->
+                <div class="space-y-6 sm:space-y-8">
+                    <div class="text-center max-w-xl mx-auto space-y-2">
+                        <h2 class="text-2xl sm:text-3xl font-black">Why Join TradeHub?</h2>
+                        <p class="text-slate-400 text-xs sm:text-sm">Built specifically for high-growth vendors, merchants, and regional entrepreneurs.</p>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                        <div class="glass-panel p-5 sm:p-6 rounded-3xl space-y-2 border border-white/10">
+                            <i class="fa-solid fa-bolt text-xl sm:text-2xl text-amber-400"></i>
+                            <h4 class="font-bold text-sm sm:text-base">Zero Hidden Fees</h4>
+                            <p class="text-xs text-slate-300">Keep 100% of your product sales with direct merchant-to-customer communication.</p>
+                        </div>
+                        <div class="glass-panel p-5 sm:p-6 rounded-3xl space-y-2 border border-white/10">
+                            <i class="fa-solid fa-credit-card text-xl sm:text-2xl text-emerald-400"></i>
+                            <h4 class="font-bold text-sm sm:text-base">Instant Paystack Pay</h4>
+                            <p class="text-xs text-slate-300">Activate subscriptions effortlessly using Mobile Money (MTN, Telecel, AirtelTigo) or cards.</p>
+                        </div>
+                        <div class="glass-panel p-5 sm:p-6 rounded-3xl space-y-2 border border-white/10">
+                            <i class="fa-solid fa-share-nodes text-xl sm:text-2xl text-brand-400"></i>
+                            <h4 class="font-bold text-sm sm:text-base">Social Viral Sharing</h4>
+                            <p class="text-xs text-slate-300">Share individual marketplace items seamlessly across WhatsApp, Twitter, and Facebook.</p>
+                        </div>
+                        <div class="glass-panel p-5 sm:p-6 rounded-3xl space-y-2 border border-white/10">
+                            <i class="fa-solid fa-shield-halved text-xl sm:text-2xl text-purple-400"></i>
+                            <h4 class="font-bold text-sm sm:text-base">Firebase Cloud Security</h4>
+                            <p class="text-xs text-slate-300">Enterprise grade image hosting and real-time cloud data backup protection.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WHAT PEOPLE SAY (TESTIMONIALS) -->
+                <div class="space-y-6 sm:space-y-8">
+                    <div class="text-center max-w-xl mx-auto space-y-2">
+                        <h2 class="text-2xl sm:text-3xl font-black">Trusted by Vendors & Buyers</h2>
+                        <p class="text-slate-400 text-xs sm:text-sm">Read real feedback from active merchants scaling their trade daily.</p>
+                    </div>
+                    <div class="grid md:grid-cols-3 gap-4 sm:gap-6">
+                        <div class="glass-panel p-5 sm:p-6 rounded-3xl space-y-4 border border-white/10 flex flex-col justify-between">
+                            <p class="text-xs text-slate-300 italic">"TradeHub transformed our textile distribution. Our customers browse our full Kente gallery and text us directly on WhatsApp."</p>
+                            <div class="flex items-center gap-3 pt-2 border-t border-slate-800">
+                                <div class="w-9 h-9 rounded-full bg-brand-500/20 flex items-center justify-center font-bold text-brand-400 text-xs">AA</div>
+                                <div>
+                                    <div class="font-bold text-xs">Ama Adomah</div>
+                                    <div class="text-[10px] text-slate-400">Owner, Ama Fashion Store</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-panel p-5 sm:p-6 rounded-3xl space-y-4 border border-white/10 flex flex-col justify-between">
+                            <p class="text-xs text-slate-300 italic">"The Paystack integration made upgrading our merchant tier seamless using Mobile Money. Instant activation!"</p>
+                            <div class="flex items-center gap-3 pt-2 border-t border-slate-800">
+                                <div class="w-9 h-9 rounded-full bg-emerald-500/20 flex items-center justify-center font-bold text-emerald-400 text-xs">KM</div>
+                                <div>
+                                    <div class="font-bold text-xs">Kwame Mensah</div>
+                                    <div class="text-[10px] text-slate-400">Founder, Crafts GH</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-panel p-5 sm:p-6 rounded-3xl space-y-4 border border-white/10 flex flex-col justify-between">
+                            <p class="text-xs text-slate-300 italic">"Being able to upload 6 product photos and download catalog entries saved us so much time managing stock."</p>
+                            <div class="flex items-center gap-3 pt-2 border-t border-slate-800">
+                                <div class="w-9 h-9 rounded-full bg-purple-500/20 flex items-center justify-center font-bold text-purple-400 text-xs">SO</div>
+                                <div>
+                                    <div class="font-bold text-xs">Sarah Osei</div>
+                                    <div class="text-[10px] text-slate-400">Merchant, Osei Collectibles</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-5 sm:p-8 rounded-3xl space-y-4 sm:space-y-6 border border-white/10">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-800 pb-4">
+                        <h2 class="text-xl sm:text-2xl font-bold">Featured Vendors & Products</h2>
+                        <button onclick="navigateTo('marketplace')" class="text-brand-400 hover:underline text-xs font-bold">View Marketplace &rarr;</button>
+                    </div>
+                    <div id="landing-products-preview" class="dashboard-grid-layout">
+                    </div>
+                </div>
+            </section>
+
+            <!-- PLANS & PAYSTACK INTEGRATED SUBSCRIPTION -->
+            <section id="view-plans" class="hidden space-y-6 sm:space-y-8 max-w-5xl mx-auto py-4 sm:py-6 w-full">
+                <div class="text-center space-y-2">
+                    <h2 class="text-2xl sm:text-3xl font-black">Vendor Subscription Plans</h2>
+                    <p class="text-slate-400 text-xs sm:text-sm">Select a tier and complete payment securely via Paystack to proceed with registration.</p>
+                </div>
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="glass-panel p-6 rounded-3xl flex flex-col justify-between shadow-md">
+                        <div class="space-y-4">
+                            <h3 class="font-bold text-lg">Starter Vendor</h3>
+                            <div class="text-3xl font-black currency-val" data-price-ghs="150">GH₵ 150<span class="text-xs font-normal text-slate-400">/mo</span></div>
+                            <ul class="text-xs space-y-2 text-slate-300">
+                                <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Min 6 Photos & Video per Item</li>
+                                <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> WhatsApp Order Redirection</li>
+                                <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Paystack Mobile Money Integration</li>
+                            </ul>
+                        </div>
+                        <button onclick="subscribeWithPaystack('Starter Vendor', 150)" class="mt-6 w-full bg-slate-800 text-white font-bold py-3 rounded-2xl hover:bg-brand-600 transition flex items-center justify-center gap-2 text-xs sm:text-sm">
+                            <i class="fa-solid fa-lock"></i> Pay with Paystack
+                        </button>
+                    </div>
+                    <div class="glass-panel p-6 rounded-3xl border-2 border-brand-500 relative flex flex-col justify-between shadow-xl">
+                        <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Most Popular</span>
+                        <div class="space-y-4">
+                            <h3 class="font-bold text-lg">Pro Merchant</h3>
+                            <div class="text-3xl font-black currency-val" data-price-ghs="390">GH₵ 390<span class="text-xs font-normal text-slate-400">/3 mos</span></div>
+                            <ul class="text-xs space-y-2 text-slate-300">
+                                <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Product Analysis Tools</li>
+                                <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Priority Marketplace Placement</li>
+                                <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Dedicated WhatsApp Line Ping</li>
+                            </ul>
+                        </div>
+                        <button onclick="subscribeWithPaystack('Pro Merchant', 390)" class="mt-6 w-full bg-brand-600 text-white font-bold py-3 rounded-2xl hover:bg-brand-700 transition flex items-center justify-center gap-2 text-xs sm:text-sm">
+                            <i class="fa-solid fa-lock"></i> Pay with Paystack
+                        </button>
+                    </div>
+                    <div class="glass-panel p-6 rounded-3xl flex flex-col justify-between shadow-md">
+                        <div class="space-y-4">
+                            <h3 class="font-bold text-lg">Enterprise Partner</h3>
+                            <div class="text-3xl font-black currency-val" data-price-ghs="1200">GH₵ 1200<span class="text-xs font-normal text-slate-400">/yr</span></div>
+                            <ul class="text-xs space-y-2 text-slate-300">
+                                <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Dedicated Cloud Storage</li>
+                                <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Unlimited Store Products</li>
+                                <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> VIP Account Manager Support</li>
+                            </ul>
+                        </div>
+                        <button onclick="subscribeWithPaystack('Enterprise Partner', 1200)" class="mt-6 w-full bg-slate-800 text-white font-bold py-3 rounded-2xl hover:bg-brand-600 transition flex items-center justify-center gap-2 text-xs sm:text-sm">
+                            <i class="fa-solid fa-lock"></i> Pay with Paystack
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- AUTHENTICATION FORM -->
+            <section id="view-auth" class="hidden max-w-md mx-auto py-6 sm:py-8 w-full">
+                <div class="glass-panel p-6 sm:p-8 rounded-3xl shadow-2xl space-y-6">
+
+                    <form id="form-login" onsubmit="handleUserLogin(event)" class="space-y-4">
+                        <div class="text-center space-y-1">
+                            <h2 class="text-2xl font-bold">User Sign In</h2>
+                            <p id="login-welcome-greeting" class="text-xs text-brand-400 font-semibold">Welcome back! Please enter your details.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase mb-1">Username or Email</label>
+                            <input type="text" id="login-username" required class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-900/50 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase mb-1">Password</label>
+                            <div class="relative">
+                                <input type="password" id="login-password" required class="w-full px-4 py-2.5 pr-10 rounded-xl border border-slate-700 bg-slate-900/50 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                                <button type="button" onclick="togglePasswordVisibility('login-password', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-brand-600 text-white font-bold py-3 rounded-xl hover:bg-brand-700 transition">Login to Marketplace</button>
+                        
+                        <div class="pt-2 border-t border-slate-800 flex flex-col gap-2">
+                            <button type="button" onclick="redirectToSubscriptionPlans()" class="w-full border border-brand-500/50 text-brand-400 font-bold py-2.5 rounded-xl hover:bg-brand-500/10 transition text-xs">
+                                Register Button (Create User Account)
+                            </button>
+                        </div>
+                    </form>
+
+                    <form id="form-register" onsubmit="handleUserRegister(event)" class="hidden space-y-4">
+                        <h2 class="text-2xl font-bold text-center">Create Registered Account</h2>
+                        
+                        <div id="reg-plan-badge" class="hidden p-3 bg-emerald-500/20 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs text-center font-bold"></div>
+
+                        <div>
+                            <label class="block text-xs font-bold uppercase mb-1">Username</label>
+                            <input type="text" id="reg-username" required class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-900/50 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase mb-1">Email Address</label>
+                            <input type="email" id="reg-email" placeholder="user@domain.com" required class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-900/50 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase mb-1">Password</label>
+                            <div class="relative">
+                                <input type="password" id="reg-password" required class="w-full px-4 py-2.5 pr-10 rounded-xl border border-slate-700 bg-slate-900/50 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                                <button type="button" onclick="togglePasswordVisibility('reg-password', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase mb-1">WhatsApp Phone Number</label>
+                            <input type="tel" id="reg-phone" placeholder="e.g. +233201234567" required class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-900/50 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold uppercase mb-1">Profile Picture (Optional)</label>
+                            <input type="file" id="reg-avatar-file" accept="image/*" class="w-full text-xs text-slate-400 bg-slate-900/50 rounded-xl p-2 border border-slate-700">
+                        </div>
+
+                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 transition">Complete Registration</button>
+                        <button type="button" onclick="toggleAuthTab('login')" class="w-full text-center text-xs text-brand-400 hover:underline">Already registered? Log In</button>
+                    </form>
+
+                </div>
+            </section>
+
+            <!-- ENHANCED USER DASHBOARD -->
+            <section id="view-user-dashboard" class="hidden space-y-6 w-full">
+                <div class="glass-panel p-4 rounded-2xl border border-brand-500/30 flex justify-between items-center bg-brand-500/10">
+                    <span id="user-dashboard-greeting" class="text-xs sm:text-sm font-bold text-brand-400">Welcome, User!</span>
+                    <span class="text-[10px] sm:text-xs text-slate-400"><i class="fa-solid fa-clock mr-1"></i> Dashboard Active</span>
+                </div>
+
+                <div class="glass-panel rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-brand-500/30">
+                    <div class="flex items-center gap-4">
+                        <img id="user-profile-avatar" src="" class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border-2 border-brand-500 object-cover bg-slate-800">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h2 id="user-profile-name" class="text-xl sm:text-2xl font-bold">User Dashboard</h2>
+                                <span id="user-profile-tier" class="bg-brand-500/20 text-brand-400 border border-brand-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Starter Tier</span>
+                            </div>
+                            <span id="user-profile-email" class="text-xs text-slate-400 block">Email: N/A</span>
+                            <span id="user-profile-phone" class="text-xs text-slate-400 block">WhatsApp: N/A</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <button onclick="openProductModal()" class="w-full sm:w-auto bg-brand-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl hover:bg-brand-700 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Add Product (Min 6 Assets)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- USER STOREFRONT LINK MANAGEMENT CARD -->
+                <div class="glass-panel rounded-2xl p-4 sm:p-5 border border-brand-500/30 space-y-3 bg-brand-500/5">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-bold text-xs sm:text-sm text-brand-400 flex items-center gap-2">
+                            <i class="fa-solid fa-link"></i> Your Public Storefront Link
+                        </h3>
+                        <button onclick="viewUserStorefront(currentUser.username)" class="text-xs font-semibold text-brand-400 hover:underline flex items-center gap-1">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Preview Store
+                        </button>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="text" id="user-storefront-link-input" readonly class="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900/80 text-xs font-mono text-slate-300 outline-none select-all">
+                        <button onclick="copyVendorStoreLink(currentUser.username)" class="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center justify-center gap-2 shrink-0">
+                            <i class="fa-solid fa-copy"></i> Copy Link
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-slate-400">Share this direct URL publicly on social media to send customers directly to your personalized store.</p>
+                </div>
+
+                <!-- USER STATS METRICS GRID -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                    <div class="glass-panel p-3.5 sm:p-4 rounded-2xl border border-white/5">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Listed Items</span>
+                        <span id="user-stat-count" class="text-xl sm:text-2xl font-black text-brand-400">0</span>
+                    </div>
+                    <div class="glass-panel p-3.5 sm:p-4 rounded-2xl border border-white/5">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Inventory Value</span>
+                        <span id="user-stat-value" class="text-xl sm:text-2xl font-black text-emerald-400 currency-val" data-price-ghs="0">GH₵ 0.00</span>
+                    </div>
+                    <div class="glass-panel p-3.5 sm:p-4 rounded-2xl border border-white/5">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Active Subscription</span>
+                        <span id="user-stat-plan" class="text-base sm:text-lg font-bold text-amber-400">Free Tier</span>
+                    </div>
+                    <div class="glass-panel p-3.5 sm:p-4 rounded-2xl border border-white/5">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Profile Security</span>
+                        <span class="text-base sm:text-lg font-bold text-teal-400 flex items-center gap-1"><i class="fa-solid fa-shield"></i> Verified</span>
+                    </div>
+                </div>
+
+                <!-- ENHANCED USER DASHBOARD QUICK ACTIONS -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                    <button onclick="navigateTo('marketplace')" class="glass-panel p-4 sm:p-5 rounded-2xl hover:border-brand-500 transition text-center space-y-1.5 sm:space-y-2">
+                        <i class="fa-solid fa-store text-xl sm:text-2xl text-brand-400"></i>
+                        <div class="font-bold text-xs sm:text-sm">Marketplace</div>
+                    </button>
+                    <button onclick="navigateTo('delivery')" class="glass-panel p-4 sm:p-5 rounded-2xl hover:border-brand-500 transition text-center space-y-1.5 sm:space-y-2">
+                        <i class="fa-solid fa-truck text-xl sm:text-2xl text-emerald-400"></i>
+                        <div class="font-bold text-xs sm:text-sm">Delivery Info</div>
+                    </button>
+                    <button onclick="navigateTo('plans')" class="glass-panel p-4 sm:p-5 rounded-2xl hover:border-brand-500 transition text-center space-y-1.5 sm:space-y-2">
+                        <i class="fa-solid fa-crown text-xl sm:text-2xl text-amber-400"></i>
+                        <div class="font-bold text-xs sm:text-sm">Plans & Paystack</div>
+                    </button>
+                    <button onclick="openUserAnalyticsModal()" class="glass-panel p-4 sm:p-5 rounded-2xl hover:border-purple-500 transition text-center space-y-1.5 sm:space-y-2">
+                        <i class="fa-solid fa-chart-line text-xl sm:text-2xl text-purple-400"></i>
+                        <div class="font-bold text-xs sm:text-sm">Store Analytics</div>
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <h3 class="font-bold text-base sm:text-lg">My Product Listings & Item Controls</h3>
+                    <div id="user-my-products-grid" class="dashboard-grid-layout">
+                    </div>
+                </div>
+            </section>
+
+            <!-- ADMIN DASHBOARD -->
+            <section id="view-admin-dashboard" class="hidden space-y-6 sm:space-y-8 w-full">
+                <div class="glass-panel p-4 rounded-2xl border border-purple-500/30 flex justify-between items-center bg-purple-500/10">
+                    <span id="admin-dashboard-greeting" class="text-xs sm:text-sm font-bold text-purple-300">Welcome, Master Admin!</span>
+                    <span class="text-[10px] sm:text-xs text-slate-400"><i class="fa-solid fa-user-shield mr-1"></i> Root Permissions Active</span>
+                </div>
+
+                <div class="glass-panel p-5 sm:p-6 rounded-3xl shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-2 border-purple-500/40">
+                    <div class="flex items-center gap-3 sm:gap-4">
+                        <div class="w-12 h-12 sm:w-14 sm:h-14 bg-purple-600 text-white font-black rounded-2xl flex items-center justify-center text-xl sm:text-2xl shadow-lg">
+                            <i class="fa-solid fa-user-shield"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl sm:text-2xl font-black text-purple-300">Central Admin Oversight</h2>
+                            <span class="text-xs text-slate-400 block">Full system telemetry, database access, and vendor management.</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="triggerGlobalBackup()" class="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md transition">
+                            Export System Backup
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                    <div class="glass-panel p-3.5 sm:p-4 rounded-2xl">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Registered Users</span>
+                        <span id="admin-stat-users" class="text-xl sm:text-2xl font-black text-purple-400">0</span>
+                    </div>
+                    <div class="glass-panel p-3.5 sm:p-4 rounded-2xl">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Total Store Products</span>
+                        <span id="admin-stat-products" class="text-xl sm:text-2xl font-black text-brand-400">0</span>
+                    </div>
+                    <div class="glass-panel p-3.5 sm:p-4 rounded-2xl">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Completed Orders</span>
+                        <span id="admin-stat-orders" class="text-xl sm:text-2xl font-black text-emerald-400">0</span>
+                    </div>
+                    <div class="glass-panel p-3.5 sm:p-4 rounded-2xl">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Platform Volume</span>
+                        <span id="admin-stat-volume" class="text-xl sm:text-2xl font-black text-amber-400 currency-val" data-price-ghs="0">GH₵ 0.00</span>
+                    </div>
+                </div>
+
+                <div class="glass-panel rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
+                    <h3 class="font-bold text-base sm:text-lg text-purple-300 border-b border-slate-800 pb-3">User Account Control</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-900/80 uppercase text-slate-400 border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3">User</th>
+                                    <th class="p-3">Email</th>
+                                    <th class="p-3">Role</th>
+                                    <th class="p-3">WhatsApp Line</th>
+                                    <th class="p-3">Store Link</th>
+                                    <th class="p-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-table-users" class="divide-y divide-slate-800">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="glass-panel rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
+                    <h3 class="font-bold text-base sm:text-lg text-brand-400 border-b border-slate-800 pb-3">Central Product Database</h3>
+                    <div id="admin-catalog-grid" class="dashboard-grid-layout">
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-marketplace" class="hidden space-y-6 w-full">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-black">Public Vendor Marketplace</h2>
+                        <p class="text-xs text-slate-400">Filter and view products by vendor or general category.</p>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <select id="marketplace-vendor-filter" onchange="filterMarketplaceByVendor(this.value)" class="bg-slate-900 text-slate-200 border border-slate-700 p-2 rounded-xl text-xs outline-none w-full sm:w-auto">
+                            <option value="ALL">Show All Vendors</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="marketplace-grid" class="dashboard-grid-layout">
+                </div>
+            </section>
+
+            <!-- PRODUCT ITEM DETAILS VIEW PAGE WITH MEDIA & SIMILAR PRODUCTS -->
+            <section id="view-item-detail" class="hidden space-y-6 max-w-5xl mx-auto py-4 sm:py-6 w-full">
+                <button onclick="navigateTo('marketplace')" class="text-xs sm:text-sm font-semibold text-brand-400 hover:underline flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Marketplace
+                </button>
+                <div id="item-detail-container" class="glass-panel rounded-3xl p-5 sm:p-8 shadow-2xl space-y-8">
+                </div>
+            </section>
+
+            <section id="view-user-storefront" class="hidden space-y-6 w-full">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <button onclick="navigateTo('marketplace')" class="text-xs sm:text-sm font-semibold text-brand-400 hover:underline flex items-center gap-2">
+                        <i class="fa-solid fa-arrow-left"></i> Back to All Vendors
+                    </button>
+                    <button onclick="navigateTo('marketplace')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded-xl border border-slate-700 font-bold transition flex items-center gap-2">
+                        <i class="fa-solid fa-globe"></i> Browse Entire Website
+                    </button>
+                </div>
+                <div id="storefront-header" class="glass-panel rounded-3xl p-5 sm:p-6 border border-brand-500/30">
+                </div>
+                <div id="storefront-products-grid" class="dashboard-grid-layout">
+                </div>
+            </section>
+
+            <section id="view-delivery" class="hidden max-w-2xl mx-auto py-4 sm:py-6 space-y-6 w-full">
+                <div class="glass-panel p-6 sm:p-8 rounded-3xl shadow-xl space-y-6">
+                    <h2 class="text-xl sm:text-2xl font-bold border-b border-slate-800 pb-3">Delivery Information Form</h2>
+                    <form onsubmit="handleDeliverySubmit(event)" class="space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold uppercase mb-1">Full Name</label>
+                                <input type="text" id="del-name" required class="w-full px-4 py-2 rounded-xl border border-slate-700 bg-slate-900/50 text-sm outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase mb-1">Contact Phone</label>
+                                <input type="tel" id="del-phone" required class="w-full px-4 py-2 rounded-xl border border-slate-700 bg-slate-900/50 text-sm outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase mb-1">Physical Delivery Address</label>
+                            <textarea id="del-address" rows="3" required class="w-full px-4 py-2 rounded-xl border border-slate-700 bg-slate-900/50 text-sm outline-none"></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-brand-600 text-white font-bold py-3 rounded-xl hover:bg-brand-700 transition text-xs sm:text-sm">Submit Delivery Info</button>
+                    </form>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="glass-panel text-slate-400 text-xs border-t border-slate-800 mt-auto">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+                <div class="space-y-3">
+                    <span class="text-base sm:text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-store text-brand-500"></i> TradeHub</span>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">TradeHub is a full-featured multi-vendor cloud e-commerce system empowering merchants with direct WhatsApp ordering, cloud product image hosting, and instant payment settlement.</p>
+                </div>
+
+                <div class="space-y-2">
+                    <h4 class="font-bold text-white uppercase text-[11px] tracking-wider">Quick Navigation</h4>
+                    <ul class="space-y-1 text-[11px]">
+                        <li><a href="#" onclick="navigateTo('landing')" class="hover:text-brand-400 transition">Home Landing</a></li>
+                        <li><a href="#" onclick="navigateTo('marketplace')" class="hover:text-brand-400 transition">Vendor Marketplace</a></li>
+                        <li><a href="#" onclick="navigateTo('plans')" class="hover:text-brand-400 transition">Subscription Plans</a></li>
+                        <li><a href="#" onclick="navigateTo('delivery')" class="hover:text-brand-400 transition">Delivery Service</a></li>
+                    </ul>
+                </div>
+
+                <div class="space-y-2">
+                    <h4 class="font-bold text-white uppercase text-[11px] tracking-wider">Company & Info</h4>
+                    <ul class="space-y-1 text-[11px]">
+                        <li><a href="#" onclick="openFooterModal('about')" class="hover:text-brand-400 transition">About Us</a></li>
+                        <li><a href="#" onclick="openFooterModal('contact')" class="hover:text-brand-400 transition">Contact Us</a></li>
+                        <li><a href="#" onclick="openFooterModal('terms')" class="hover:text-brand-400 transition">Terms & Conditions</a></li>
+                        <li><a href="#" onclick="openFooterModal('privacy')" class="hover:text-brand-400 transition">Privacy Policy</a></li>
+                    </ul>
+                </div>
+
+                <div class="space-y-2">
+                    <h4 class="font-bold text-white uppercase text-[11px] tracking-wider">Platform Security</h4>
+                    <p class="text-[11px] text-slate-400">Secured with Paystack Inline Processing & Firebase Storage.</p>
+                    <div class="flex items-center gap-2 text-base text-slate-300 pt-1">
+                        <i class="fa-brands fa-cc-visa hover:text-white"></i>
+                        <i class="fa-brands fa-cc-mastercard hover:text-white"></i>
+                        <i class="fa-solid fa-mobile-screen-button hover:text-emerald-400" title="Mobile Money"></i>
+                        <i class="fa-brands fa-whatsapp hover:text-emerald-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 border-t border-slate-800/80 flex flex-col sm:flex-row justify-between items-center gap-2">
+                <p class="text-[10px] sm:text-xs text-center sm:text-left">&copy; 2026 TradeHub Multi-Vendor Systems. All rights reserved.</p>
+                <p id="footer-currency-indicator" class="text-[10px] text-brand-400">Default Currency: Ghana Cedis (GH₵)</p>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        /*************************************************************
+         * DATA STATE & LOCAL STORAGE INITIALIZATION
+         *************************************************************/
+        const STORAGE_USERS = 'tradehub_v3_users';
+        const STORAGE_CURRENT_USER = 'tradehub_v3_activeuser';
+        const STORAGE_ADMIN = 'tradehub_v3_admin';
+        const STORAGE_PRODUCTS = 'tradehub_v3_products';
+        const STORAGE_RECYCLED = 'tradehub_v3_recycled_products';
+        const STORAGE_CURRENCY = 'tradehub_v3_currency';
+        const STORAGE_NOTIFS = 'tradehub_v3_notifications';
+
+        const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E";
+        const DEFAULT_PRODUCT_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polyline%3E%3C/svg%3E";
+        const DEFAULT_DEMO_VIDEO = "https://www.w3schools.com/html/mov_bbb.mp4";
+
+        const CURRENCY_RATES = {
+            GHS: { symbol: 'GH₵ ', rate: 1.0 },
+            USD: { symbol: '$ ', rate: 0.082 },
+            EUR: { symbol: '€ ', rate: 0.076 },
+            GBP: { symbol: '£ ', rate: 0.065 },
+            NGN: { symbol: '₦ ', rate: 120.0 }
+        };
+
+        let currentCurrency = localStorage.getItem(STORAGE_CURRENCY) || 'GHS';
+
+        let users = JSON.parse(localStorage.getItem(STORAGE_USERS)) || [
+            { username: 'kwame_store', email: 'kwame@tradehub.com', password: 'User123!', phone: '+233201112233', avatar: DEFAULT_AVATAR, plan: 'Free Tier' },
+            { username: 'ama_fashion', email: 'ama@tradehub.com', password: 'User123!', phone: '+233244998877', avatar: DEFAULT_AVATAR, plan: 'Pro Merchant' }
+        ];
+
+        let currentUser = JSON.parse(localStorage.getItem(STORAGE_CURRENT_USER)) || null;
+        let activeAdmin = JSON.parse(localStorage.getItem(STORAGE_ADMIN)) || { username: 'admin', email: 'admin@tradehub.com', password: 'admin123' };
+
+        let products = JSON.parse(localStorage.getItem(STORAGE_PRODUCTS)) || [
+            {
+                id: 'p_101',
+                vendorUsername: 'kwame_store',
+                vendorEmail: 'kwame@tradehub.com',
+                title: 'Handcrafted Wooden Stool',
+                priceGHS: 250,
+                stock: 12,
+                images: [
+                    'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1538688525198-9b88f6f53126?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80'
+                ],
+                video: DEFAULT_DEMO_VIDEO,
+                image: 'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=600&q=80',
+                description: 'Authentic carved wooden craft produced locally with high durability and traditional design motifs.',
+                contactPhone: '+233201112233'
+            },
+            {
+                id: 'p_102',
+                vendorUsername: 'ama_fashion',
+                vendorEmail: 'ama@tradehub.com',
+                title: 'Kente Fabric Textile',
+                priceGHS: 450,
+                stock: 8,
+                images: [
+                    'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=600&q=80'
+                ],
+                video: DEFAULT_DEMO_VIDEO,
+                image: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80',
+                description: 'High grade traditional handwoven cloth suitable for ceremonies and custom wear.',
+                contactPhone: '+233244998877'
+            }
+        ];
+
+        let recycledProducts = JSON.parse(localStorage.getItem(STORAGE_RECYCLED)) || [];
+        let notifications = JSON.parse(localStorage.getItem(STORAGE_NOTIFS)) || [];
+        let pendingPaidPlan = null;
+        let deferredPWAInstallPrompt = null;
+
+        /*************************************************************
+         * INITIALIZATION & PERSISTENT SESSION ROUTING
+         *************************************************************/
+        window.addEventListener('DOMContentLoaded', () => {
+            saveData();
+            applyCurrencyFormatting();
+            initPWA();
+
+            // Handle Direct URL Store Query Parameters (?store=username)
+            const urlParams = new URLSearchParams(window.location.search);
+            const requestedStore = urlParams.get('store');
+
+            if (requestedStore) {
+                viewUserStorefront(requestedStore);
+            } else if (activeAdmin && activeAdmin.isLoggedIn) {
+                renderAdminDashboard();
+                navigateTo('admin-dashboard');
+            } else if (currentUser) {
+                renderUserDashboard();
+                navigateTo('user-dashboard');
+            } else {
+                updateNavBar(false);
+                navigateTo('landing');
+            }
+            renderLandingPreview();
+            renderSidebarSettings();
+            updateNotificationUI();
+            populateVendorFilterOptions();
+        });
+
+        // Overlay click-away listener for notification dropdown
+        document.addEventListener('click', (e) => {
+            const notifDropdown = document.getElementById('notif-dropdown');
+            const notifButton = e.target.closest('button[title="Notifications"]');
+            if (notifDropdown && !notifDropdown.contains(e.target) && !notifButton) {
+                notifDropdown.classList.add('hidden');
+            }
+        });
+
+        /*************************************************************
+         * PWA (PROGRESSIVE WEB APP) MOBILE INSTALLATION
+         *************************************************************/
+        function initPWA() {
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPWAInstallPrompt = e;
+                const banner = document.getElementById('pwa-install-banner');
+                if (banner) banner.classList.remove('hidden');
+            });
+
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    self.addEventListener('install', (e) => self.skipWaiting());
+                    self.addEventListener('activate', (e) => self.clients.claim());
+                    self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request).catch(() => new Response('Offline'))));
+                `;
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(err => console.warn('SW Register:', err));
+            }
+        }
+
+        function triggerPWAInstall() {
+            if (deferredPWAInstallPrompt) {
+                deferredPWAInstallPrompt.prompt();
+                deferredPWAInstallPrompt.userChoice.then((choice) => {
+                    if (choice.outcome === 'accepted') {
+                        notify('App installed successfully to home screen!', 'success');
+                    }
+                    deferredPWAInstallPrompt = null;
+                    dismissPWAInstall();
+                });
+            } else {
+                notify('To install TradeHub, tap your browser menu and select "Add to Home Screen".', 'info');
+                dismissPWAInstall();
+            }
+        }
+
+        function dismissPWAInstall() {
+            const banner = document.getElementById('pwa-install-banner');
+            if (banner) banner.classList.add('hidden');
+        }
+
+        function saveData() {
+            localStorage.setItem(STORAGE_USERS, JSON.stringify(users));
+            localStorage.setItem(STORAGE_CURRENT_USER, JSON.stringify(currentUser));
+            localStorage.setItem(STORAGE_ADMIN, JSON.stringify(activeAdmin));
+            localStorage.setItem(STORAGE_PRODUCTS, JSON.stringify(products));
+            localStorage.setItem(STORAGE_RECYCLED, JSON.stringify(recycledProducts));
+            localStorage.setItem(STORAGE_CURRENCY, currentCurrency);
+            localStorage.setItem(STORAGE_NOTIFS, JSON.stringify(notifications));
+        }
+
+        function toggleDarkMode() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            document.getElementById('theme-toggle-icon').className = isDark ? "fa-solid fa-sun text-amber-400 text-lg" : "fa-solid fa-moon text-slate-700 text-lg";
+        }
+
+        function togglePasswordVisibility(inputId, buttonEl) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            buttonEl.innerHTML = isPassword ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>';
+        }
+
+        /*************************************************************
+         * NOTIFICATION SYSTEM
+         *************************************************************/
+        function toggleNotificationDropdown(e) {
+            if (e) e.stopPropagation();
+            const dropdown = document.getElementById('notif-dropdown');
+            dropdown.classList.toggle('hidden');
+        }
+
+        function markNotifRead(id) {
+            const index = notifications.findIndex(n => n.id === id);
+            if (index !== -1 && !notifications[index].read) {
+                notifications[index].read = true;
+                saveData();
+                updateNotificationUI();
+            }
+        }
+
+        function updateNotificationUI() {
+            const listContainer = document.getElementById('notif-list-container');
+            const badge = document.getElementById('notif-badge');
+            
+            if (!notifications || notifications.length === 0) {
+                listContainer.innerHTML = `<p class="text-slate-400 text-center text-xs py-2">No recent activity logs.</p>`;
+                badge.classList.add('hidden');
+                badge.textContent = '0';
+                return;
+            }
+
+            const unreadCount = notifications.filter(n => !n.read).length;
+            if (unreadCount > 0) {
+                badge.classList.remove('hidden');
+                badge.textContent = unreadCount;
+            } else {
+                badge.classList.add('hidden');
+                badge.textContent = '0';
+            }
+
+            listContainer.innerHTML = notifications.map(n => `
+                <div onclick="markNotifRead('${n.id}')" class="p-2.5 rounded-xl border transition cursor-pointer ${n.read ? 'bg-slate-900/40 border-slate-800 opacity-60' : 'bg-slate-900 border-brand-500/40 shadow-sm'}">
+                    <div class="text-[11px] text-slate-200 flex justify-between items-start gap-2">
+                        <span class="font-semibold leading-snug">${n.text}</span>
+                        ${!n.read ? '<span class="w-2 h-2 rounded-full bg-brand-500 shrink-0 mt-1"></span>' : ''}
+                    </div>
+                    <div class="text-[9px] text-slate-400 text-right mt-1"><i class="fa-solid fa-clock mr-1"></i>${n.time}</div>
+                </div>
+            `).join('');
+        }
+
+        function clearNotifications() {
+            notifications = [];
+            saveData();
+            updateNotificationUI();
+            notify('Notification history cleared.', 'info');
+        }
+
+        /*************************************************************
+         * ROUTING & NAVBAR LOGIC
+         *************************************************************/
+        function navigateTo(viewId) {
+            const views = ['landing', 'plans', 'auth', 'user-dashboard', 'admin-dashboard', 'marketplace', 'item-detail', 'user-storefront', 'delivery'];
+            views.forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                if (el) el.classList.add('hidden');
+            });
+
+            const target = document.getElementById(`view-${viewId}`);
+            if (target) target.classList.remove('hidden');
+
+            renderSidebarSettings();
+
+            if (viewId === 'user-dashboard') renderUserDashboard();
+            if (viewId === 'admin-dashboard') renderAdminDashboard();
+            if (viewId === 'marketplace') renderMarketplace();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function handleLogoClick() {
+            if (activeAdmin && activeAdmin.isLoggedIn) navigateTo('admin-dashboard');
+            else if (currentUser) navigateTo('user-dashboard');
+            else navigateTo('landing');
+        }
+
+        function updateNavBar(isLoggedIn) {
+            const navBar = document.getElementById('app-nav-bar');
+            const authArea = document.getElementById('nav-auth-area');
+
+            if (activeAdmin && activeAdmin.isLoggedIn) {
+                navBar.innerHTML = `
+                    <button onclick="navigateTo('admin-dashboard')" class="text-purple-400 font-bold">Admin Panel</button>
+                    <button onclick="navigateTo('marketplace')" class="hover:text-brand-400">Marketplace</button>
+                `;
+                authArea.innerHTML = `
+                    <span class="text-xs bg-purple-600/30 text-purple-300 px-2.5 py-1 rounded-lg border border-purple-500/30 font-bold">Root Admin</span>
+                    <button onclick="confirmLogout()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-xl border border-slate-700">Logout</button>
+                `;
+            } else if (currentUser) {
+                navBar.innerHTML = `
+                    <button onclick="navigateTo('marketplace')" class="hover:text-brand-400">Marketplace</button>
+                    <button onclick="navigateTo('delivery')" class="hover:text-brand-400">Delivery Info</button>
+                    <button onclick="navigateTo('plans')" class="hover:text-brand-400">Plans</button>
+                `;
+                authArea.innerHTML = `
+                    <button onclick="navigateTo('user-dashboard')" class="text-xs sm:text-sm font-bold text-brand-400 hover:underline flex items-center gap-1">
+                        <i class="fa-solid fa-circle-user"></i> ${currentUser.username}
+                    </button>
+                    <button onclick="confirmLogout()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-xl border border-slate-700">Logout</button>
+                `;
+            } else {
+                navBar.innerHTML = `
+                    <button onclick="navigateTo('landing')" class="hover:text-brand-400">Home</button>
+                    <button onclick="navigateTo('marketplace')" class="hover:text-brand-400">Marketplace</button>
+                    <button onclick="navigateTo('delivery')" class="hover:text-brand-400">Delivery Info</button>
+                    <button onclick="navigateTo('plans')" class="hover:text-brand-400">Plans</button>
+                `;
+                authArea.innerHTML = `
+                    <button onclick="navigateTo('auth'); toggleAuthTab('login');" class="text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-semibold hover:bg-slate-800 transition">Login</button>
+                    <button onclick="redirectToSubscriptionPlans()" class="text-xs sm:text-sm bg-brand-600 hover:bg-brand-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-semibold transition shadow-md">Register</button>
+                `;
+            }
+        }
+
+        function redirectToSubscriptionPlans() {
+            notify("Please select a subscription plan before completing registration.", "info");
+            navigateTo('plans');
+        }
+
+        /*************************************************************
+         * CURRENCY CONVERSION & FORMATTING
+         *************************************************************/
+        function updateSelectedCurrency(newCurr) {
+            currentCurrency = newCurr;
+            saveData();
+            applyCurrencyFormatting();
+            notify(`Currency switched to ${newCurr}.`, 'info');
+        }
+
+        function formatCurrency(priceGHS) {
+            const currencyObj = CURRENCY_RATES[currentCurrency] || CURRENCY_RATES.GHS;
+            const converted = (priceGHS * currencyObj.rate).toFixed(2);
+            return `${currencyObj.symbol}${converted}`;
+        }
+
+        function applyCurrencyFormatting() {
+            document.querySelectorAll('.currency-val').forEach(el => {
+                const ghsVal = parseFloat(el.getAttribute('data-price-ghs') || 0);
+                el.textContent = formatCurrency(ghsVal);
+            });
+            const indicator = document.getElementById('footer-currency-indicator');
+            if (indicator) {
+                indicator.textContent = `Currency: ${currentCurrency} (${CURRENCY_RATES[currentCurrency].symbol})`;
+            }
+        }
+
+        /*************************************************************
+         * SIDEBAR SETTINGS & PHONE UPDATE LOGIC
+         *************************************************************/
+        function renderSidebarSettings() {
+            const container = document.getElementById('sidebar-features-container');
+            const userFooter = document.getElementById('sidebar-user-footer');
+            if (!container) return;
+
+            let adminBtnHeader = `
+                <div class="mb-4 pb-3 border-b border-slate-800">
+                    <button onclick="openAdminLoginModal(); closeSettingsSidebar();" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition">
+                        <i class="fa-solid fa-user-shield"></i> Admin Login / Portal
+                    </button>
+                </div>
+            `;
+
+            if (activeAdmin && activeAdmin.isLoggedIn) {
+                container.innerHTML = `
+                    <div class="bg-slate-900/40 p-3.5 rounded-2xl border border-slate-700/50 space-y-2">
+                        <label class="font-bold text-xs uppercase tracking-wider text-brand-400 flex items-center gap-2">
+                            <i class="fa-solid fa-money-bill-transfer"></i> Currency Display
+                        </label>
+                        <select id="currency-selector" onchange="updateSelectedCurrency(this.value)" class="w-full bg-slate-900 text-slate-200 border border-slate-700 p-2 rounded-xl text-xs outline-none focus:border-brand-500">
+                            <option value="GHS" ${currentCurrency === 'GHS' ? 'selected' : ''}>Ghana Cedis (GH₵)</option>
+                            <option value="USD" ${currentCurrency === 'USD' ? 'selected' : ''}>US Dollars ($)</option>
+                            <option value="EUR" ${currentCurrency === 'EUR' ? 'selected' : ''}>Euros (€)</option>
+                            <option value="GBP" ${currentCurrency === 'GBP' ? 'selected' : ''}>British Pounds (£)</option>
+                            <option value="NGN" ${currentCurrency === 'NGN' ? 'selected' : ''}>Nigerian Naira (₦)</option>
+                        </select>
+                    </div>
+
+                    <div class="space-y-3 pt-2 border-t border-slate-800">
+                        <h4 class="font-bold text-xs uppercase text-purple-400 tracking-wider">Admin Profile Settings</h4>
+                        <form onsubmit="handleAdminProfileUpdate(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-[10px] font-bold uppercase mb-1">Admin Username</label>
+                                <input type="text" id="admin-set-username" value="${activeAdmin.username || 'admin'}" required class="w-full p-2 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold uppercase mb-1">Admin Email</label>
+                                <input type="email" id="admin-set-email" value="${activeAdmin.email || 'admin@tradehub.com'}" required class="w-full p-2 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold uppercase mb-1">New Password</label>
+                                <div class="relative">
+                                    <input type="password" id="admin-set-pass" placeholder="New Password" class="w-full p-2 pr-8 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                                    <button type="button" onclick="togglePasswordVisibility('admin-set-pass', this)" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-xl text-xs transition">Update Admin Info</button>
+                        </form>
+                    </div>
+
+                    <div class="space-y-2 pt-2 border-t border-slate-800">
+                        <h4 class="font-bold text-xs uppercase text-purple-400 tracking-wider">Advanced Admin Features</h4>
+                        <button onclick="openProductAnalysisModal()" class="w-full text-left px-3 py-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-800 flex items-center gap-3 transition border border-slate-800 text-xs">
+                            <i class="fa-solid fa-magnifying-glass-chart text-brand-500"></i> Platform Analytics & Audit
+                        </button>
+                        <button onclick="triggerGlobalBackup()" class="w-full text-left px-3 py-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-800 flex items-center gap-3 transition border border-slate-800 text-xs">
+                            <i class="fa-solid fa-database text-purple-400"></i> Export Database JSON
+                        </button>
+                    </div>
+                `;
+
+                userFooter.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center font-bold text-white text-xs">
+                            <i class="fa-solid fa-user-shield"></i>
+                        </div>
+                        <div class="truncate max-w-[110px]">
+                            <div class="font-bold text-xs text-purple-300 truncate">${activeAdmin.username}</div>
+                            <div class="text-[10px] text-slate-400 truncate">${activeAdmin.email}</div>
+                        </div>
+                    </div>
+                    <button onclick="confirmLogout()" class="text-rose-400 hover:text-rose-300 text-xs font-bold p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                    </button>
+                `;
+            } else if (currentUser) {
+                const userRecycled = recycledProducts.filter(p => p.vendorUsername === currentUser.username);
+
+                container.innerHTML = `
+                    ${adminBtnHeader}
+                    <div class="space-y-3 p-3 bg-slate-900/40 rounded-2xl border border-slate-700/50">
+                        <h4 class="font-bold text-xs uppercase text-brand-400 tracking-wider">Account Settings</h4>
+                        
+                        <form onsubmit="handleUserProfileUpdate(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-[10px] font-bold uppercase mb-1">Store Name / Username</label>
+                                <input type="text" id="user-set-username" value="${currentUser.username}" required class="w-full p-2 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold uppercase mb-1 text-emerald-400"><i class="fa-brands fa-whatsapp mr-1"></i> Registered Phone Number</label>
+                                <input type="tel" id="user-set-phone" value="${currentUser.phone || ''}" required placeholder="+233..." class="w-full p-2 rounded-xl border border-slate-700 bg-slate-900 text-xs focus:ring-1 focus:ring-emerald-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold uppercase mb-1">New Password</label>
+                                <div class="relative">
+                                    <input type="password" id="user-set-pass" placeholder="New Password" class="w-full p-2 pr-8 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                                    <button type="button" onclick="togglePasswordVisibility('user-set-pass', this)" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2 rounded-xl text-xs transition">Save Profile Info</button>
+                        </form>
+                    </div>
+
+                    <!-- ADVANCED USER SIDEBAR TOOLS -->
+                    <div class="space-y-2 p-3 bg-slate-900/40 rounded-2xl border border-slate-700/50">
+                        <h4 class="font-bold text-xs uppercase text-amber-400 tracking-wider">Advanced Merchant Tools</h4>
+                        <button onclick="openUserAnalyticsModal()" class="w-full text-left px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 flex items-center gap-2.5 transition text-xs border border-slate-800">
+                            <i class="fa-solid fa-chart-pie text-amber-400"></i> Store Metrics & Telemetry
+                        </button>
+                        <button onclick="triggerPWAInstall()" class="w-full text-left px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 flex items-center gap-2.5 transition text-xs border border-slate-800">
+                            <i class="fa-solid fa-download text-emerald-400"></i> Install Mobile App
+                        </button>
+                    </div>
+
+                    <!-- RECYCLING BIN SECTION -->
+                    <div class="p-3 bg-slate-900/40 rounded-2xl border border-slate-700/50 space-y-3">
+                        <h4 class="font-bold text-xs uppercase text-amber-400 tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-trash-can"></i> Recycling Bin (${userRecycled.length})
+                        </h4>
+                        ${userRecycled.length === 0 ? '<p class="text-[11px] text-slate-500">No deleted items in trash.</p>' : 
+                            userRecycled.map(rp => `
+                                <div class="p-2 bg-slate-900 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
+                                    <div class="truncate text-xs">
+                                        <div class="font-semibold text-slate-200 truncate">${rp.title}</div>
+                                        <div class="text-[10px] text-slate-400">GH₵ ${rp.priceGHS}</div>
+                                    </div>
+                                    <div class="flex gap-1">
+                                        <button onclick="restoreRecycledProduct('${rp.id}')" title="Restore" class="p-1.5 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white rounded-lg text-xs">
+                                            <i class="fa-solid fa-rotate-left"></i>
+                                        </button>
+                                        <button onclick="permanentlyDeleteProduct('${rp.id}')" title="Delete Permanently" class="p-1.5 bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white rounded-lg text-xs">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')
+                        }
+                    </div>
+
+                    <div class="space-y-3 pt-2 border-t border-slate-800">
+                        <h4 class="font-bold text-xs uppercase text-rose-400 tracking-wider">Danger Zone</h4>
+                        <button onclick="confirmDeleteUserAccount()" class="w-full bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white font-bold py-2 rounded-xl text-xs transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-user-xmark"></i> Delete Account
+                        </button>
+                    </div>
+                `;
+
+                userFooter.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <img src="${currentUser.avatar || DEFAULT_AVATAR}" class="w-10 h-10 rounded-full object-cover border border-brand-500 bg-slate-800">
+                        <div class="truncate max-w-[110px]">
+                            <div class="font-bold text-xs truncate text-white">${currentUser.username}</div>
+                            <div class="text-[10px] text-brand-400 truncate">${currentUser.plan || 'Free Tier'}</div>
+                        </div>
+                    </div>
+                    <button onclick="confirmLogout()" class="text-rose-400 hover:text-rose-300 text-xs font-bold p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                    </button>
+                `;
+            } else {
+                container.innerHTML = `
+                    ${adminBtnHeader}
+                    <div class="space-y-4 pt-2">
+                        <h4 class="font-bold text-xs uppercase text-brand-400 tracking-wider">Preferences & Automation</h4>
+                        <div class="flex items-center justify-between text-xs py-1">
+                            <span>Email Notifications</span>
+                            <input type="checkbox" checked class="rounded text-brand-600 focus:ring-brand-500">
+                        </div>
+                        <button onclick="triggerPWAInstall()" class="w-full bg-brand-600 text-white font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-download"></i> Install App on Device
+                        </button>
+                    </div>
+                `;
+
+                userFooter.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-400 text-xs">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-white">Guest User</div>
+                            <div class="text-[10px] text-slate-400">Not Logged In</div>
+                        </div>
+                    </div>
+                    <button onclick="closeSettingsSidebar(); navigateTo('auth');" class="text-brand-400 hover:text-brand-300 text-xs font-bold p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition">
+                        Login
+                    </button>
+                `;
+            }
+        }
+
+        function handleUserProfileUpdate(e) {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            const oldUsername = currentUser.username;
+            const newUsername = document.getElementById('user-set-username').value.trim();
+            const newPhone = document.getElementById('user-set-phone').value.trim();
+            const newPass = document.getElementById('user-set-pass').value;
+
+            // Check username collision if changed
+            if (newUsername !== oldUsername && users.some(u => u.username.toLowerCase() === newUsername.toLowerCase())) {
+                notify("Username already taken.", "error");
+                return;
+            }
+
+            currentUser.username = newUsername;
+            currentUser.phone = newPhone;
+            if (newPass) currentUser.password = newPass;
+
+            // Update user in main array
+            const uIdx = users.findIndex(u => u.email === currentUser.email);
+            if (uIdx !== -1) {
+                users[uIdx] = { ...currentUser };
+            }
+
+            // Sync vendor references in products
+            products.forEach(p => {
+                if (p.vendorUsername === oldUsername || p.vendorEmail === currentUser.email) {
+                    p.vendorUsername = newUsername;
+                    p.contactPhone = newPhone;
+                }
+            });
+
+            saveData();
+            renderSidebarSettings();
+            renderUserDashboard();
+            notify("Phone number and profile updated successfully!", "success");
+        }
+
+        function handleAdminProfileUpdate(e) {
+            e.preventDefault();
+            if (!activeAdmin) return;
+
+            const u = document.getElementById('admin-set-username').value.trim();
+            const email = document.getElementById('admin-set-email').value.trim();
+            const pass = document.getElementById('admin-set-pass').value;
+
+            activeAdmin.username = u;
+            activeAdmin.email = email;
+            if (pass) activeAdmin.password = pass;
+
+            saveData();
+            renderSidebarSettings();
+            renderAdminDashboard();
+            notify("Admin credentials updated successfully.", "success");
+        }
+
+        /*************************************************************
+         * RECYCLING BIN RESTORE / PERMANENT DELETE LOGIC
+         *************************************************************/
+        function confirmDeleteProduct(id) {
+            const index = products.findIndex(p => p.id === id);
+            if (index !== -1) {
+                const deletedItem = products.splice(index, 1)[0];
+                recycledProducts.push(deletedItem);
+                saveData();
+                renderUserDashboard();
+                if (activeAdmin && activeAdmin.isLoggedIn) renderAdminDashboard();
+                renderSidebarSettings();
+                notify(`"${deletedItem.title}" moved to Recycling Bin.`, 'info');
+            }
+        }
+
+        function restoreRecycledProduct(id) {
+            const index = recycledProducts.findIndex(p => p.id === id);
+            if (index !== -1) {
+                const restoredItem = recycledProducts.splice(index, 1)[0];
+                products.push(restoredItem);
+                saveData();
+                renderUserDashboard();
+                if (activeAdmin && activeAdmin.isLoggedIn) renderAdminDashboard();
+                renderSidebarSettings();
+                notify(`"${restoredItem.title}" restored to active inventory.`, 'success');
+            }
+        }
+
+        function permanentlyDeleteProduct(id) {
+            recycledProducts = recycledProducts.filter(p => p.id !== id);
+            saveData();
+            renderSidebarSettings();
+            notify("Product permanently removed.", "info");
+        }
+
+        /* Sidebar Toggle Functions */
+        function toggleSettingsSidebar() {
+            document.getElementById('settings-sidebar').classList.toggle('-translate-x-full');
+            document.getElementById('sidebar-backdrop').classList.toggle('hidden');
+        }
+
+        function closeSettingsSidebar() {
+            document.getElementById('settings-sidebar').classList.add('-translate-x-full');
+            document.getElementById('sidebar-backdrop').classList.add('hidden');
+        }
+
+        function showCustomModal(title, bodyHtml) {
+            const modal = document.getElementById('modal-overlay');
+            const content = document.getElementById('modal-content');
+            content.innerHTML = `
+                <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                    <h3 class="text-lg sm:text-xl font-bold">${title}</h3>
+                    <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1 rounded-lg"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="text-xs space-y-3 mb-5">${bodyHtml}</div>
+                <button onclick="closeModal()" class="w-full bg-slate-800 text-white font-bold py-2.5 rounded-xl hover:bg-brand-600 text-xs transition">Close</button>
+            `;
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').classList.add('hidden');
+        }
+
+        /*************************************************************
+         * USER LOGINS WITH EMAIL OR USERNAME ACROSS DEVICES
+         *************************************************************/
+        function handleUserLogin(e) {
+            e.preventDefault();
+            const identifier = document.getElementById('login-username').value.trim();
+            const pass = document.getElementById('login-password').value;
+
+            const user = users.find(u => 
+                (u.username.toLowerCase() === identifier.toLowerCase() || u.email.toLowerCase() === identifier.toLowerCase()) && 
+                u.password === pass
+            );
+
+            if (user) {
+                currentUser = user;
+                if (activeAdmin) activeAdmin.isLoggedIn = false;
+                saveData();
+                notify(`Welcome back, ${user.username}!`, 'success');
+                updateNavBar(true);
+                navigateTo('user-dashboard');
+            } else {
+                notify('Invalid username/email or password credentials.', 'error');
+            }
+        }
+
+        async function handleUserRegister(e) {
+            e.preventDefault();
+            const username = document.getElementById('reg-username').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const password = document.getElementById('reg-password').value;
+            const phone = document.getElementById('reg-phone').value.trim();
+            const avatarFile = document.getElementById('reg-avatar-file').files[0];
+
+            if (users.find(u => u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === email.toLowerCase())) {
+                notify('Username or Email already registered.', 'error');
+                return;
+            }
+
+            let avatarUrl = DEFAULT_AVATAR;
+            if (avatarFile) {
+                avatarUrl = await fileToBase64(avatarFile);
+            }
+
+            const assignedPlan = pendingPaidPlan || 'Starter Vendor';
+            const newUser = { username, email, password, phone, avatar: avatarUrl, plan: assignedPlan };
+            users.push(newUser);
+            currentUser = newUser;
+            pendingPaidPlan = null;
+            if (activeAdmin) activeAdmin.isLoggedIn = false;
+            saveData();
+
+            notify('User account registered successfully!', 'success');
+            updateNavBar(true);
+            navigateTo('user-dashboard');
+        }
+
+        function toggleAuthTab(tab) {
+            navigateTo('auth');
+            document.getElementById('form-login').classList.add('hidden');
+            document.getElementById('form-register').classList.add('hidden');
+
+            if (tab === 'login') document.getElementById('form-login').classList.remove('hidden');
+            if (tab === 'register') document.getElementById('form-register').classList.remove('hidden');
+        }
+
+        function openAdminLoginModal() {
+            showCustomModal('Admin Authorization Access', `
+                <form onsubmit="handleAdminLogin(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase mb-1">Admin Username</label>
+                        <input type="text" id="admin-login-user" value="${activeAdmin.username || 'admin'}" required class="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase mb-1">Admin Password Protected Key</label>
+                        <div class="relative">
+                            <input type="password" id="admin-login-pass" value="${activeAdmin.password || 'admin123'}" required class="w-full p-2.5 pr-10 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                            <button type="button" onclick="togglePasswordVisibility('admin-login-pass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-xs transition">Authenticate Admin</button>
+                </form>
+            `);
+        }
+
+        function handleAdminLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('admin-login-user').value.trim();
+            const p = document.getElementById('admin-login-pass').value;
+
+            if (u === (activeAdmin.username || 'admin') && p === (activeAdmin.password || 'admin123')) {
+                activeAdmin.isLoggedIn = true;
+                currentUser = null;
+                saveData();
+                closeModal();
+                notify('Admin Access Granted.', 'success');
+                updateNavBar(true);
+                navigateTo('admin-dashboard');
+            } else {
+                notify('Invalid Admin Credentials!', 'error');
+            }
+        }
+
+        function confirmLogout() {
+            showCustomModal('Confirm Logout', `
+                <div class="space-y-4">
+                    <p class="text-slate-300">Are you sure you want to log out of your session?</p>
+                    <div class="flex gap-2">
+                        <button onclick="logout()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded-xl text-xs transition">Logout</button>
+                        <button onclick="closeModal()" class="w-full bg-slate-800 text-slate-300 font-bold py-2 rounded-xl text-xs hover:bg-slate-700 transition">Cancel</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        function logout() {
+            currentUser = null;
+            if (activeAdmin) activeAdmin.isLoggedIn = false;
+            saveData();
+            closeModal();
+            closeSettingsSidebar();
+            updateNavBar(false);
+            notify('Logged out successfully.', 'info');
+            navigateTo('landing');
+        }
+
+        /*************************************************************
+         * PAYSTACK SUBSCRIPTION INTEGRATION
+         *************************************************************/
+        function subscribeWithPaystack(planName, priceGHS) {
+            const userEmail = currentUser ? currentUser.email : 'newmerchant@tradehub.com';
+
+            if (typeof PaystackPop === 'undefined') {
+                notify('Paystack SDK is loading. Please try again.', 'error');
+                return;
+            }
+
+            const handler = PaystackPop.setup({
+                key: 'pk_test_83ef5571585074d04c4e27091aa867e1db960ed6',
+                email: userEmail,
+                amount: priceGHS * 100,
+                currency: 'GHS',
+                ref: 'TH_SUB_' + Math.floor((Math.random() * 1000000000) + 1),
+                metadata: { plan: planName, username: currentUser ? currentUser.username : 'Guest' },
+                callback: function(response) {
+                    notify(`Payment Successful! Reference: ${response.reference}`, 'success');
+                    
+                    if (currentUser) {
+                        currentUser.plan = planName;
+                        const userIdx = users.findIndex(u => u.username === currentUser.username);
+                        if (userIdx !== -1) users[userIdx].plan = planName;
+                        saveData();
+                        renderUserDashboard();
+                    } else {
+                        pendingPaidPlan = planName;
+                        navigateTo('auth');
+                        toggleAuthTab('register');
+
+                        const badge = document.getElementById('reg-plan-badge');
+                        if (badge) {
+                            badge.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i> ${planName} Payment Complete! Complete your registration below.`;
+                            badge.classList.remove('hidden');
+                        }
+
+                        notify(`Payment received for ${planName}. Complete account registration to launch your store!`, 'success');
+                    }
+                },
+                onClose: function() {
+                    notify('Paystack checkout window closed.', 'info');
+                }
+            });
+
+            handler.openIframe();
+        }
+
+        /*************************************************************
+         * DASHBOARD RENDERING & PRODUCT ACTIONS
+         *************************************************************/
+        function renderUserDashboard() {
+            if (!currentUser) return navigateTo('landing');
+
+            document.getElementById('user-dashboard-greeting').textContent = `Welcome back, ${currentUser.username}! Glad to see you again.`;
+            document.getElementById('user-profile-name').textContent = currentUser.username;
+            document.getElementById('user-profile-email').textContent = `Email: ${currentUser.email || 'N/A'}`;
+            document.getElementById('user-profile-phone').textContent = `WhatsApp: ${currentUser.phone}`;
+            document.getElementById('user-profile-avatar').src = currentUser.avatar || DEFAULT_AVATAR;
+
+            const userPlanEl = document.getElementById('user-profile-tier');
+            if (userPlanEl) userPlanEl.textContent = currentUser.plan || 'Free Tier';
+
+            // Populate Vendor Storefront Link Input
+            const storeLinkInput = document.getElementById('user-storefront-link-input');
+            if (storeLinkInput) {
+                storeLinkInput.value = generateStorefrontLink(currentUser.username);
+            }
+
+            const myItems = products.filter(p => p.vendorUsername === currentUser.username);
+            
+            document.getElementById('user-stat-count').textContent = myItems.length;
+            const totalInventoryVal = myItems.reduce((acc, p) => acc + (parseFloat(p.priceGHS) * parseInt(p.stock || 1)), 0);
+            const valEl = document.getElementById('user-stat-value');
+            valEl.setAttribute('data-price-ghs', totalInventoryVal);
+            document.getElementById('user-stat-plan').textContent = currentUser.plan || 'Free Tier';
+
+            const grid = document.getElementById('user-my-products-grid');
+
+            if (myItems.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-slate-400 text-center py-6 text-xs">You have no listed products. Click "+ Add Product" to list items.</div>`;
+            } else {
+                grid.innerHTML = myItems.map(p => `
+                    <div class="glass-panel rounded-2xl overflow-hidden shadow-sm p-3 space-y-2 flex flex-col justify-between border border-white/10 hover:border-brand-500/40 transition">
+                        <div class="space-y-2 cursor-pointer" onclick="openProductDetail('${p.id}')">
+                            <img src="${p.image || DEFAULT_PRODUCT_IMG}" class="h-32 sm:h-36 w-full object-cover rounded-xl bg-slate-900">
+                            <div class="font-bold text-xs truncate">${p.title}</div>
+                            <div class="text-brand-400 font-black text-xs currency-val" data-price-ghs="${p.priceGHS}">GH₵ ${p.priceGHS}</div>
+                            <p class="text-[10px] text-slate-400 line-clamp-2">${p.description}</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-800">
+                            <button onclick="editProductModal('${p.id}')" class="bg-slate-800 text-slate-200 py-1 rounded-lg font-bold hover:bg-slate-700 text-[10px] flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-pen"></i> Edit
+                            </button>
+                            <button onclick="downloadProductData('${p.id}')" class="bg-slate-800 text-slate-200 py-1 rounded-lg font-bold hover:bg-slate-700 text-[10px] flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-download"></i> Download
+                            </button>
+                            <button onclick="shareProduct('${p.id}', '${p.title}')" class="bg-brand-600/20 text-brand-400 border border-brand-500/30 py-1 rounded-lg font-bold hover:bg-brand-600/30 text-[10px] flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-share-nodes"></i> Share
+                            </button>
+                            <button onclick="confirmDeleteProduct('${p.id}')" class="bg-rose-500/20 text-rose-300 border border-rose-500/30 py-1 rounded-lg font-bold hover:bg-rose-500/30 text-[10px] flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            applyCurrencyFormatting();
+        }
+
+        function renderAdminDashboard() {
+            if (!activeAdmin || !activeAdmin.isLoggedIn) return navigateTo('landing');
+
+            document.getElementById('admin-stat-users').textContent = users.length;
+            document.getElementById('admin-stat-products').textContent = products.length;
+            
+            const totalVol = products.reduce((acc, p) => acc + (parseFloat(p.priceGHS) * parseInt(p.stock || 1)), 0);
+            document.getElementById('admin-stat-volume').setAttribute('data-price-ghs', totalVol);
+
+            const userTable = document.getElementById('admin-table-users');
+            userTable.innerHTML = users.map(u => `
+                <tr>
+                    <td class="p-3 font-semibold">${u.username}</td>
+                    <td class="p-3 text-slate-400">${u.email}</td>
+                    <td class="p-3"><span class="bg-brand-500/20 text-brand-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">${u.plan || 'Free'}</span></td>
+                    <td class="p-3 font-mono text-emerald-400">${u.phone || 'N/A'}</td>
+                    <td class="p-3">
+                        <button onclick="copyVendorStoreLink('${u.username}')" class="text-brand-400 hover:text-brand-300 font-bold text-[10px] flex items-center gap-1 bg-brand-500/10 border border-brand-500/30 px-2 py-1 rounded-lg transition">
+                            <i class="fa-solid fa-link"></i> Store Link
+                        </button>
+                    </td>
+                    <td class="p-3 flex items-center gap-2">
+                        <button onclick="adminEditUserModal('${u.username}')" class="text-brand-400 hover:underline font-bold text-[10px]"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
+                        <button onclick="deleteUserAccount('${u.username}')" class="text-rose-400 hover:underline font-bold text-[10px]"><i class="fa-solid fa-trash mr-1"></i>Remove</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            const catalogGrid = document.getElementById('admin-catalog-grid');
+            catalogGrid.innerHTML = products.map(p => `
+                <div class="glass-panel rounded-2xl p-3 space-y-2 border border-white/10 flex flex-col justify-between">
+                    <div class="space-y-2 cursor-pointer" onclick="openProductDetail('${p.id}')">
+                        <img src="${p.image || DEFAULT_PRODUCT_IMG}" class="h-28 w-full object-cover rounded-xl bg-slate-900">
+                        <div class="font-bold text-xs truncate">${p.title}</div>
+                        <div class="text-[10px] text-slate-400">Vendor: ${p.vendorUsername}</div>
+                        <div class="text-brand-400 font-bold text-xs currency-val" data-price-ghs="${p.priceGHS}">GH₵ ${p.priceGHS}</div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1 pt-2 border-t border-slate-800">
+                        <button onclick="editProductModal('${p.id}')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 py-1 rounded text-[10px] font-bold">Edit</button>
+                        <button onclick="confirmDeleteProduct('${p.id}')" class="bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white py-1 rounded text-[10px] font-bold">Remove</button>
+                    </div>
+                </div>
+            `).join('');
+            applyCurrencyFormatting();
+        }
+
+        /*************************************************************
+         * VENDOR STOREFRONT LINK GENERATION & NAVIGATION
+         *************************************************************/
+        function generateStorefrontLink(vendorUsername) {
+            const baseUrl = window.location.origin + window.location.pathname;
+            return `${baseUrl}?store=${encodeURIComponent(vendorUsername)}`;
+        }
+
+        function copyVendorStoreLink(vendorUsername) {
+            const link = generateStorefrontLink(vendorUsername);
+            navigator.clipboard.writeText(link).then(() => {
+                notify(`Store link for @${vendorUsername} copied to clipboard!`, 'success');
+            }).catch(() => {
+                notify('Failed to copy link. Please copy manually.', 'error');
+            });
+        }
+
+        function viewUserStorefront(vendorUsername) {
+            const vendor = users.find(u => u.username.toLowerCase() === vendorUsername.toLowerCase());
+            const vendorProducts = products.filter(p => p.vendorUsername.toLowerCase() === vendorUsername.toLowerCase());
+
+            const headerContainer = document.getElementById('storefront-header');
+            const gridContainer = document.getElementById('storefront-products-grid');
+
+            const avatarSrc = vendor ? (vendor.avatar || DEFAULT_AVATAR) : DEFAULT_AVATAR;
+            const phoneStr = vendor ? (vendor.phone || 'N/A') : 'N/A';
+
+            headerContainer.innerHTML = `
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <img src="${avatarSrc}" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-brand-500 object-cover bg-slate-800">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h1 class="text-2xl sm:text-3xl font-black text-white">${vendorUsername}'s Official Store</h1>
+                                <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">Verified Vendor</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-1"><i class="fa-solid fa-box-open mr-1 text-brand-400"></i> ${vendorProducts.length} Active Product Listings</p>
+                            <p class="text-xs text-slate-400"><i class="fa-brands fa-whatsapp mr-1 text-emerald-400"></i> Direct Line: ${phoneStr}</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <button onclick="copyVendorStoreLink('${vendorUsername}')" class="bg-brand-600/20 text-brand-400 border border-brand-500/30 hover:bg-brand-600 hover:text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-share-nodes"></i> Share Store Link
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            if (vendorProducts.length === 0) {
+                gridContainer.innerHTML = `<div class="col-span-full text-slate-400 text-center py-12 text-sm">This vendor currently has no products listed.</div>`;
+            } else {
+                gridContainer.innerHTML = vendorProducts.map(p => `
+                    <div class="glass-panel rounded-2xl overflow-hidden shadow-sm p-3 space-y-2 flex flex-col justify-between border border-white/10 hover:border-brand-500/40 transition">
+                        <div class="space-y-2 cursor-pointer" onclick="openProductDetail('${p.id}')">
+                            <img src="${p.image || DEFAULT_PRODUCT_IMG}" class="h-36 sm:h-40 w-full object-cover rounded-xl bg-slate-900">
+                            <div class="font-bold text-xs sm:text-sm truncate">${p.title}</div>
+                            <div class="text-brand-400 font-black text-xs sm:text-sm currency-val" data-price-ghs="${p.priceGHS}">GH₵ ${p.priceGHS}</div>
+                            <p class="text-[10px] sm:text-xs text-slate-400 line-clamp-2">${p.description}</p>
+                        </div>
+                        <div class="pt-2 border-t border-slate-800/80">
+                            <button onclick="openProductDetail('${p.id}')" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-1.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-eye"></i> View Details
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            applyCurrencyFormatting();
+            navigateTo('user-storefront');
+        }
+
+        /*************************************************************
+         * FOOTER MODAL DIALOGS WITH FUNCTIONAL CONTENT
+         *************************************************************/
+        function openFooterModal(modalType) {
+            let title = '';
+            let contentHtml = '';
+
+            if (modalType === 'about') {
+                title = 'About TradeHub Multi-Vendor System';
+                contentHtml = `
+                    <p class="leading-relaxed text-slate-300">TradeHub is a cloud-based multi-vendor e-commerce architecture designed to empower localized micro-entrepreneurs, regional merchants, and commercial distributors across Ghana and global markets.</p>
+                    <p class="leading-relaxed text-slate-300">Our core platform facilitates direct social commerce integration via WhatsApp ordering links, instant Mobile Money and credit card subscription clearing via Paystack Inline JS, multi-media asset cloud storage, and responsive Progressive Web Application (PWA) client deployment.</p>
+                    <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                        <h4 class="font-bold text-brand-400 text-xs">Platform Specifications</h4>
+                        <ul class="text-[11px] text-slate-400 space-y-1">
+                            <li>• High-resolution multi-photo product galleries</li>
+                            <li>• Instant Mobile Money (MTN, Telecel, AirtelTigo) & Card payments</li>
+                            <li>• Zero transaction commission models for direct WhatsApp sales</li>
+                            <li>• Firebase cloud security & persistent client storage</li>
+                        </ul>
+                    </div>
+                `;
+            } else if (modalType === 'contact') {
+                title = 'Contact TradeHub Support';
+                contentHtml = `
+                    <p class="text-slate-300">Reach our platform operations center and technical support desk directly:</p>
+                    <div class="space-y-2 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+                        <div class="flex items-center gap-2 text-slate-200">
+                            <i class="fa-solid fa-location-dot text-brand-500"></i>
+                            <span>Ghana Digital Centres, Ring Road Central, Accra</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-slate-200">
+                            <i class="fa-solid fa-envelope text-brand-500"></i>
+                            <span>support@tradehub.com</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-emerald-400 font-bold">
+                            <i class="fa-brands fa-whatsapp text-lg"></i>
+                            <span>+233 20 111 2233</span>
+                        </div>
+                    </div>
+                `;
+            } else if (modalType === 'terms') {
+                title = 'Terms & Conditions';
+                contentHtml = `
+                    <div class="space-y-3 text-slate-300 max-h-60 overflow-y-auto custom-scrollbar p-1">
+                        <h4 class="font-bold text-white text-xs">1. Merchant Responsibilities</h4>
+                        <p class="text-[11px]">Vendors must ensure all uploaded catalog photos, specifications, and prices accurately depict physical stock. Prohibited item listings will result in account suspension.</p>
+                        <h4 class="font-bold text-white text-xs">2. Payment Processing & Escrow</h4>
+                        <p class="text-[11px]">All platform tier subscriptions are non-refundable once activated via Paystack. Direct customer orders completed over WhatsApp are governed by local buyer-seller agreements.</p>
+                        <h4 class="font-bold text-white text-xs">3. Delivery Guidelines</h4>
+                        <p class="text-[11px]">Local doorstep deliveries support Pay on Delivery (COD). Inter-regional courier shipments require full payment clearing prior to parcel dispatch.</p>
+                    </div>
+                `;
+            } else if (modalType === 'privacy') {
+                title = 'Privacy Policy';
+                contentHtml = `
+                    <div class="space-y-3 text-slate-300 max-h-60 overflow-y-auto custom-scrollbar p-1">
+                        <p class="text-[11px]">TradeHub respects merchant and buyer privacy. Personal contact details, phone numbers, and profile information collected during registration are strictly utilized for order routing and account authentication.</p>
+                        <p class="text-[11px]">Payment processing credentials (cards and Mobile Money PINs) are handled entirely within Paystack's PCI-DSS compliant iframe SDK and are never stored on TradeHub cloud servers.</p>
+                    </div>
+                `;
+            }
+
+            showCustomModal(title, contentHtml);
+        }
+
+        /*************************************************************
+         * MARKETPLACE & FILTERING
+         *************************************************************/
+        function populateVendorFilterOptions() {
+            const select = document.getElementById('marketplace-vendor-filter');
+            if (!select) return;
+            select.innerHTML = '<option value="ALL">Show All Vendors</option>';
+            users.forEach(u => {
+                select.innerHTML += `<option value="${u.username}">${u.username}'s Store</option>`;
+            });
+        }
+
+        function filterMarketplaceByVendor(vendorUsername) {
+            if (vendorUsername === 'ALL') {
+                renderMarketplace();
+            } else {
+                viewUserStorefront(vendorUsername);
+            }
+        }
+
+        function renderMarketplace() {
+            const grid = document.getElementById('marketplace-grid');
+            if (!grid) return;
+
+            if (products.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-slate-400 text-center py-12 text-sm">No products listed in marketplace.</div>`;
+                return;
+            }
+
+            grid.innerHTML = products.map(p => `
+                <div class="glass-panel rounded-2xl overflow-hidden shadow-sm p-3 space-y-2 flex flex-col justify-between border border-white/10 hover:border-brand-500/40 transition">
+                    <div class="space-y-2 cursor-pointer" onclick="openProductDetail('${p.id}')">
+                        <img src="${p.image || DEFAULT_PRODUCT_IMG}" class="h-36 sm:h-40 w-full object-cover rounded-xl bg-slate-900">
+                        <div class="font-bold text-xs sm:text-sm truncate">${p.title}</div>
+                        <div class="text-[10px] text-slate-400 flex justify-between items-center">
+                            <span>Vendor: <strong class="text-brand-400 hover:underline" onclick="event.stopPropagation(); viewUserStorefront('${p.vendorUsername}');">@${p.vendorUsername}</strong></span>
+                        </div>
+                        <div class="text-brand-400 font-black text-xs sm:text-sm currency-val" data-price-ghs="${p.priceGHS}">GH₵ ${p.priceGHS}</div>
+                    </div>
+                    <div class="pt-2 border-t border-slate-800/80">
+                        <button onclick="openProductDetail('${p.id}')" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-1.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-eye"></i> View Item
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            applyCurrencyFormatting();
+        }
+
+        function renderLandingPreview() {
+            const container = document.getElementById('landing-products-preview');
+            if (!container) return;
+
+            const previewItems = products.slice(0, 4);
+            container.innerHTML = previewItems.map(p => `
+                <div class="glass-panel rounded-2xl p-3 space-y-2 border border-white/10 flex flex-col justify-between cursor-pointer" onclick="openProductDetail('${p.id}')">
+                    <img src="${p.image || DEFAULT_PRODUCT_IMG}" class="h-32 sm:h-36 w-full object-cover rounded-xl bg-slate-900">
+                    <div class="font-bold text-xs truncate">${p.title}</div>
+                    <div class="text-brand-400 font-black text-xs currency-val" data-price-ghs="${p.priceGHS}">GH₵ ${p.priceGHS}</div>
+                    <p class="text-[10px] text-slate-400 line-clamp-2">${p.description}</p>
+                </div>
+            `).join('');
+
+            applyCurrencyFormatting();
+        }
+
+        /*************************************************************
+         * PRODUCT DETAIL VIEW & MODAL CONTROLS
+         *************************************************************/
+        function openProductDetail(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            const container = document.getElementById('item-detail-container');
+            const galleryImages = (product.images && product.images.length > 0) ? product.images : [product.image || DEFAULT_PRODUCT_IMG];
+
+            container.innerHTML = `
+                <div class="grid md:grid-cols-2 gap-6 sm:gap-8">
+                    <div class="space-y-4">
+                        <img id="detail-main-img" src="${galleryImages[0]}" class="w-full h-72 sm:h-80 object-cover rounded-2xl border border-slate-700 bg-slate-900 shadow-lg">
+                        <div class="grid grid-cols-6 gap-2">
+                            ${galleryImages.map((img, idx) => `
+                                <img src="${img}" onclick="document.getElementById('detail-main-img').src='${img}'" class="h-12 w-full object-cover rounded-lg border border-slate-700 cursor-pointer hover:border-brand-500 transition bg-slate-900">
+                            `).join('')}
+                        </div>
+                        ${product.video ? `
+                            <div class="pt-2">
+                                <h4 class="font-bold text-xs text-slate-400 uppercase mb-1"><i class="fa-solid fa-video text-brand-400 mr-1"></i> Product Demo Video</h4>
+                                <video controls class="w-full rounded-2xl border border-slate-700 bg-black max-h-48">
+                                    <source src="${product.video}" type="video/mp4">
+                                </video>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="space-y-4 sm:space-y-6 flex flex-col justify-between">
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="bg-brand-500/20 text-brand-400 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase border border-brand-500/30">Verified Product</span>
+                                <button onclick="viewUserStorefront('${product.vendorUsername}')" class="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1">
+                                    <i class="fa-solid fa-store text-brand-400"></i> Store: @${product.vendorUsername}
+                                </button>
+                            </div>
+                            <h1 class="text-2xl sm:text-3xl font-black text-white">${product.title}</h1>
+                            <div class="text-2xl sm:text-3xl font-black text-brand-400 currency-val" data-price-ghs="${product.priceGHS}">GH₵ ${product.priceGHS}</div>
+                            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">${product.description}</p>
+                            
+                            <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-xs space-y-1">
+                                <div><strong class="text-slate-400">In Stock:</strong> ${product.stock || 1} units available</div>
+                                <div><strong class="text-slate-400">Vendor WhatsApp:</strong> ${product.contactPhone || 'N/A'}</div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 pt-4 border-t border-slate-800">
+                            <a href="https://wa.me/${(product.contactPhone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello @${product.vendorUsername}, I am interested in purchasing "${product.title}" listed on TradeHub for GH₵ ${product.priceGHS}.`)}" target="_blank" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-xs sm:text-sm shadow-lg">
+                                <i class="fa-brands fa-whatsapp text-lg"></i> Buy Now via WhatsApp
+                            </a>
+                            <button onclick="shareProduct('${product.id}', '${product.title}')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-share-nodes"></i> Share Product Listing
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            applyCurrencyFormatting();
+            navigateTo('item-detail');
+        }
+
+        function openProductModal() {
+            if (!currentUser) {
+                notify("Please login to add products.", "error");
+                navigateTo('auth');
+                return;
+            }
+
+            showCustomModal("Add New Product Listing (Min 6 Photos)", `
+                <form onsubmit="handleProductAdd(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase mb-1">Product Title</label>
+                        <input type="text" id="add-p-title" required class="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase mb-1">Price (GH₵)</label>
+                            <input type="number" step="0.01" id="add-p-price" required class="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase mb-1">Stock Units</label>
+                            <input type="number" id="add-p-stock" value="1" required class="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase mb-1">Description</label>
+                        <textarea id="add-p-desc" rows="3" required class="w-full p-2 rounded-xl border border-slate-700 bg-slate-900 text-xs"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase mb-1 text-brand-400">Product Images (Upload 6 Images)</label>
+                        <input type="file" id="add-p-files" multiple accept="image/*" required class="w-full text-xs text-slate-400 bg-slate-900 rounded-xl p-2 border border-slate-700">
+                        <p class="text-[9px] text-slate-400 mt-1">Hold Ctrl/Shift to select multiple files.</p>
+                    </div>
+                    <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-xl text-xs transition">Upload Item to Store</button>
+                </form>
+            `);
+        }
+
+        async function handleProductAdd(e) {
+            e.preventDefault();
+            const title = document.getElementById('add-p-title').value.trim();
+            const price = parseFloat(document.getElementById('add-p-price').value);
+            const stock = parseInt(document.getElementById('add-p-stock').value);
+            const desc = document.getElementById('add-p-desc').value.trim();
+            const fileInput = document.getElementById('add-p-files');
+
+            const files = Array.from(fileInput.files);
+            if (files.length < 6) {
+                notify("Please select at least 6 high-resolution images for your product listing gallery.", "error");
+                return;
+            }
+
+            notify("Uploading image assets...", "info");
+            const uploadedUrls = [];
+            for (let f of files.slice(0, 6)) {
+                const b64 = await fileToBase64(f);
+                uploadedUrls.push(b64);
+            }
+
+            const newProduct = {
+                id: 'p_' + Date.now(),
+                vendorUsername: currentUser.username,
+                vendorEmail: currentUser.email,
+                title,
+                priceGHS: price,
+                stock,
+                images: uploadedUrls,
+                image: uploadedUrls[0],
+                video: DEFAULT_DEMO_VIDEO,
+                description: desc,
+                contactPhone: currentUser.phone || ''
+            };
+
+            products.unshift(newProduct);
+            saveData();
+            closeModal();
+            renderUserDashboard();
+            notify("Product published successfully!", "success");
+        }
+
+        function editProductModal(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            showCustomModal("Edit Product Listing", `
+                <form onsubmit="handleProductEdit(event, '${product.id}')" class="space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase mb-1">Product Title</label>
+                        <input type="text" id="edit-p-title" value="${product.title}" required class="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase mb-1">Price (GH₵)</label>
+                            <input type="number" step="0.01" id="edit-p-price" value="${product.priceGHS}" required class="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase mb-1">Stock Units</label>
+                            <input type="number" id="edit-p-stock" value="${product.stock || 1}" required class="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase mb-1">Description</label>
+                        <textarea id="edit-p-desc" rows="3" required class="w-full p-2 rounded-xl border border-slate-700 bg-slate-900 text-xs">${product.description}</textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-xl text-xs transition">Save Product Changes</button>
+                </form>
+            `);
+        }
+
+        function handleProductEdit(e, productId) {
+            e.preventDefault();
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            product.title = document.getElementById('edit-p-title').value.trim();
+            product.priceGHS = parseFloat(document.getElementById('edit-p-price').value);
+            product.stock = parseInt(document.getElementById('edit-p-stock').value);
+            product.description = document.getElementById('edit-p-desc').value.trim();
+
+            saveData();
+            closeModal();
+            renderUserDashboard();
+            if (activeAdmin && activeAdmin.isLoggedIn) renderAdminDashboard();
+            notify("Product updated successfully!", "success");
+        }
+
+        function shareProduct(id, title) {
+            const url = window.location.href;
+            if (navigator.share) {
+                navigator.share({ title: title, url: url }).catch(() => {});
+            } else {
+                navigator.clipboard.writeText(url);
+                notify("Product link copied to clipboard!", "success");
+            }
+        }
+
+        function downloadProductData(id) {
+            const product = products.find(p => p.id === id);
+            if (!product) return;
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(product, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `${product.title.replace(/\s+/g, '_')}_data.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            notify("Product catalog entry downloaded.", "info");
+        }
+
+        /*************************************************************
+         * ADMIN USER CONTROLS & SYSTEM BACKUP
+         *************************************************************/
+        function adminEditUserModal(username) {
+            const u = users.find(user => user.username === username);
+            if (!u) return;
+
+            showCustomModal(`Edit User: @${u.username}`, `
+                <form onsubmit="handleAdminUserEdit(event, '${u.username}')" class="space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase mb-1">Email</label>
+                        <input type="email" id="admin-edit-email" value="${u.email}" required class="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase mb-1">Phone Number</label>
+                        <input type="tel" id="admin-edit-phone" value="${u.phone || ''}" required class="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase mb-1">Subscription Tier</label>
+                        <select id="admin-edit-plan" class="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs">
+                            <option value="Free Tier" ${u.plan === 'Free Tier' ? 'selected' : ''}>Free Tier</option>
+                            <option value="Starter Vendor" ${u.plan === 'Starter Vendor' ? 'selected' : ''}>Starter Vendor</option>
+                            <option value="Pro Merchant" ${u.plan === 'Pro Merchant' ? 'selected' : ''}>Pro Merchant</option>
+                            <option value="Enterprise Partner" ${u.plan === 'Enterprise Partner' ? 'selected' : ''}>Enterprise Partner</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-xs transition">Save User Settings</button>
+                </form>
+            `);
+        }
+
+        function handleAdminUserEdit(e, username) {
+            e.preventDefault();
+            const u = users.find(user => user.username === username);
+            if (!u) return;
+
+            u.email = document.getElementById('admin-edit-email').value.trim();
+            u.phone = document.getElementById('admin-edit-phone').value.trim();
+            u.plan = document.getElementById('admin-edit-plan').value;
+
+            saveData();
+            closeModal();
+            renderAdminDashboard();
+            notify(`User @${username} updated.`, "success");
+        }
+
+        function deleteUserAccount(username) {
+            users = users.filter(u => u.username !== username);
+            products = products.filter(p => p.vendorUsername !== username);
+            saveData();
+            renderAdminDashboard();
+            notify(`User account @${username} removed.`, "info");
+        }
+
+        function confirmDeleteUserAccount() {
+            if (!currentUser) return;
+            showCustomModal("Confirm Account Deletion", `
+                <div class="space-y-4">
+                    <p class="text-rose-300 font-bold text-xs">Warning: Deleting your account will permanently purge your product listings.</p>
+                    <div class="flex gap-2">
+                        <button onclick="deleteUserAccount('${currentUser.username}'); logout();" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded-xl text-xs transition">Confirm Delete</button>
+                        <button onclick="closeModal()" class="w-full bg-slate-800 text-slate-300 font-bold py-2 rounded-xl text-xs transition">Cancel</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        function triggerGlobalBackup() {
+            const fullData = { users, products, recycledProducts, currentCurrency, timestamp: new Date().toISOString() };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `TradeHub_System_Backup_${Date.now()}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            notify("Full system backup exported successfully.", "success");
+        }
+
+        function openProductAnalysisModal() {
+            showCustomModal("Platform Telemetry & Audit", `
+                <div class="space-y-3 text-xs">
+                    <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 flex justify-between">
+                        <span>Total Users Registered:</span>
+                        <strong class="text-brand-400">${users.length}</strong>
+                    </div>
+                    <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 flex justify-between">
+                        <span>Total Live Catalog Items:</span>
+                        <strong class="text-emerald-400">${products.length}</strong>
+                    </div>
+                    <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 flex justify-between">
+                        <span>Recycling Bin Size:</span>
+                        <strong class="text-amber-400">${recycledProducts.length}</strong>
+                    </div>
+                </div>
+            `);
+        }
+
+        function openUserAnalyticsModal() {
+            if (!currentUser) return;
+            const myItems = products.filter(p => p.vendorUsername === currentUser.username);
+            showCustomModal("Store Metrics", `
+                <div class="space-y-3 text-xs">
+                    <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 flex justify-between">
+                        <span>Store Owner:</span>
+                        <strong class="text-brand-400">@${currentUser.username}</strong>
+                    </div>
+                    <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 flex justify-between">
+                        <span>Active Listings:</span>
+                        <strong class="text-emerald-400">${myItems.length}</strong>
+                    </div>
+                </div>
+            `);
+        }
+
+        /*************************************************************
+         * UTILITY FUNCTIONS & TOAST NOTIFICATIONS
+         *************************************************************/
+        function handleDeliverySubmit(e) {
+            e.preventDefault();
+            notify("Delivery information submitted successfully!", "success");
+            e.target.reset();
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function notify(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-rose-600' : 'bg-brand-600';
+            
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold pointer-events-auto flex items-center justify-between transition transform translate-y-2 opacity-0`;
+            toast.innerHTML = `
+                <span>${message}</span>
+                <button onclick="this.parentElement.remove()" class="ml-3 text-white/80 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            `;
+
+            container.appendChild(toast);
+            
+            // Add notification to log history
+            const notifItem = {
+                id: 'n_' + Date.now(),
+                text: message,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                read: false
+            };
+            notifications.unshift(notifItem);
+            saveData();
+            updateNotificationUI();
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
